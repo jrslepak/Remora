@@ -67,12 +67,18 @@
         map]
    [--> (in-hole E (fun arr ...))
         (in-hole E (fun arr_lifted ...))
-        (where (num_r ...) (fun-rank fun))
-        (where (arr_lifted ...) (frame-lift ([num_r arr] ...)))
+        (where (natural_r ...) (fun-rank fun))
+        (where (arr_lifted ...) (frame-lift ([natural_r arr] ...)))
         ; arrays must be overranked by different amounts
-        (side-condition (not (term (same-overrank? [(num_r arr) ...]))))
+        (side-condition (not (term (same-overrank? [(natural_r arr) ...]))))
         (side-condition (< 0 (length (term (arr ...)))))
         lift]
+   [--> (in-hole E (fun arr ...))
+        (in-hole E (fun_natrank arr ...))
+        (side-condition (not (andmap exact-nonnegative-integer?
+                                     (term (fun-rank fun)))))
+        (where fun_natrank (naturalize-rank fun arr ...))
+        naturalize]
    [--> (in-hole E (A (num_f ...) (arr ...)))
         (in-hole E (A (num_f ... num_c ...) any_v))
         (where any_v ,(foldr append '() (term ((value arr) ...))))
@@ -88,6 +94,19 @@
   scalar : num -> arr
   [(scalar num) (A () (num))])
 
+
+;; rewrite a function to eliminate negative/infinite arg ranks
+(define-metafunction Arrays
+  naturalize-rank : fun arr ... -> fun
+  [(naturalize-rank (λ [(var num) ...] expr) arr ...)
+   (λ [(var natural) ...] expr)
+   (where (natural ...) ((natural-cell-rank num arr) ...))])
+(define-metafunction Arrays
+  natural-cell-rank : num arr -> num
+  [(natural-cell-rank natural arr) natural]
+  [(natural-cell-rank +inf.0 arr) (rank arr)]
+  ; TODO: some of this code is duplicated elsewhere -- clean that up
+  [(natural-cell-rank num_neg arr) ,(+ (term (rank arr)) (term num_neg))])
 
 ;; get the shape of all given arrays, or return #f if not all are the same
 (define-metafunction Arrays
@@ -195,15 +214,28 @@
   [(at-rank? num arr)
    #t
    (where num (rank arr))]
+  [(at-rank? +inf.0 arr) #t]
   [(at-rank? num arr) #f])
 
 ;; make sure array is above desired rank
 (define-metafunction Arrays
   overrank? : num arr -> bool
+  [(overrank? +inf.0 arr) #f]
   [(overrank? num arr)
    #t
    (side-condition (< (term num) (term (rank arr))))]
   [(overrank? num arr) #f])
+
+;; find how far above desired rank array is
+(define-metafunction Arrays
+  overrank : num arr -> num or #f
+  [(overrank +inf.0 arr) 0]
+  [(overrank num_neg arr)
+   ,(- (term num_neg))
+   (side-condition (negative? (term num_neg)))
+   (side-condition (>= (- (term num_neg)) (term (rank arr))))]
+  [(overrank num arr) ,(- (term num) (term (rank arr)))]
+  [(overrank num arr) #f])
 
 ;; make sure all arrays are overranked by the same amount
 (define-metafunction Arrays
@@ -212,8 +244,8 @@
   [(same-overrank? [(num arr)]) #t]
   [(same-overrank? [(num_1 arr_1) (num_2 arr_2) (num_3 arr_3) ...])
    (same-overrank? [(num_2 arr_2) (num_3 arr_3) ...])
-   (side-condition (= (- (term num_1) (term (rank arr_1)))
-                      (- (term num_2) (term (rank arr_2)))))]
+   (side-condition (= (term (overrank num_1 arr_1))
+                      (term (overrank num_2 arr_2))))]
   [(same-overrank? [(num_1 arr_1) (num_2 arr_2) (num_3 arr_3) ...]) #f])
   
 
@@ -234,14 +266,27 @@
   [(value (A (num ...) (expr ...))) (expr ...)])
 
 ;; grow argument arrays by duplication so they all have their desired ranks
+;; frame-lift preprocesses input by converting infinite/negative cell ranks
+;; to natural rank -- actual array growth is handled by frame-lift*
 (define-metafunction Arrays
   ; [(cell-rank array) ...]
   frame-lift : [(num arr) ...] -> (arr ...)
-  [(frame-lift []) ()]
+  [(frame-lift [(natural arr) ...]) (frame-lift* [(natural arr) ...])]
+  [(frame-lift [(natural_0 arr_0) ... (+inf.0 arr_1) (num_2 arr_2) ...])
+   (frame-lift [(natural_0 arr_0) ... ((rank arr_1) arr_1) (num_2 arr_2) ...])]
+  [(frame-lift [(natural_0 arr_0) ... (num_neg arr_1) (num_2 arr_2) ...])
+   (frame-lift [(natural_0 arr_0) ... (num_nat arr_1) (num_2 arr_2) ...])
+   (side-condition (and (exact-integer? (term num_neg))
+                        (negative? (term num_neg))))
+   (where num_nat (natural-cell-rank num_neg arr_1))])
+(define-metafunction Arrays
+  ; [(cell-rank array) ...]
+  frame-lift* : [(num arr) ...] -> (arr ...)
+  [(frame-lift* []) ()]
   ; make sure arrays can be lifted into same frame
   ; (need prefix relation for frame shapes)
   ; "principal frame" comes from least-overranked array
-  [(frame-lift [(num_cr arr) ...])
+  [(frame-lift* [(num_cr arr) ...])
    ((cell-dup num_cr (num_pfr ...) arr) ...)
    ; extract frame shapes
    (where ((num_fr ...) ...)
@@ -249,10 +294,7 @@
    ; find the longest one -- that is the principal frame
    (where (num_pfr ...) (longest ((num_fr ...) ...)))
    ; all other frames must be prefixes of it
-   (side-condition (term (all ((prefix? (num_fr ...) (num_pfr ...)) ...))))
-   ]
-   
-  )
+   (side-condition (term (all ((prefix? (num_fr ...) (num_pfr ...)) ...))))])
 
 ;; duplicate cells of given array to lift it into desired frame
 (define-metafunction Arrays
@@ -401,27 +443,40 @@
 
 
 
-
-; two simple examples for how rank affects array lifting
-(check-equal?
- (apply-reduction-relation*
-  ->Array
-  (term (+ (A (3 3) (1 2 3
-                                            4 5 6
-                                            7 8 9))
-                                 (A (3) (10 20 30)))))
- (term ((A (3 3) (11 12 13
-                  24 25 26
-                  37 38 39)))))
-
-(check-equal?
- (apply-reduction-relation*
-  ->Array
-  (term ((λ ([x 1][y 1]) (+ x y)) (A (3 3) (1 2 3
-                                            4 5 6
-                                            7 8 9))
-                                 (A (3) (10 20 30)))))
- (term ((A (3 3) (11 22 33
-                  14 25 36
-                  17 28 39)))))
+(module+
+ test
+ 
+ ; three simple examples for how rank affects array lifting
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (+ (A (3 3) (1 2 3
+                      4 5 6
+                      7 8 9))
+            (A (3) (10 20 30)))))
+  (term ((A (3 3) (11 12 13
+                   24 25 26
+                   37 38 39)))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x 1][y 1]) (+ x y)) (A (3 3) (1 2 3
+                                             4 5 6
+                                             7 8 9))
+                                   (A (3) (10 20 30)))))
+  (term ((A (3 3) (11 22 33
+                   14 25 36
+                   17 28 39)))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x -1][y 1]) (+ x y)) (A (3 3) (1 2 3
+                                              4 5 6
+                                              7 8 9))
+                                    (A (3) (10 20 30)))))
+  (term ((A (3 3) (11 22 33
+                   14 25 36
+                   17 28 39))))))
 
