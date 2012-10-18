@@ -18,8 +18,13 @@
   ; also include nested vector representation?
   (arr (A (num ...) (expr ...))) ; flat representation, shape and values
   
+  (arr/v (A (num ...) (elt ...))) ; pseudo-value form -- no app forms inside
+  (elt arr/v base)
+  (arr/b (A (num ...) (base ...))) ; value form -- only base data inside
+  
   ; builtin operators
-  (op + - * /)
+  (op + - * /
+      reduce/r)
   
   ; variables
   (var variable-not-otherwise-mentioned)
@@ -32,7 +37,7 @@
   ; value forms
   (val (λ [(var num) ...] expr)
        op
-       (A (num ...) (base ...)))
+       arr/b)
   
   ; evaluation contexts
   (E hole
@@ -48,42 +53,46 @@
   (reduction-relation
    Arrays
    #:domain expr
+   [--> (in-hole E ((reduce/r fun) arr/v))
+        (in-hole E (chain-apply/r fun (arr/v_cell ...)))
+        (where (arr/v_cell ...) (cells/rank -1 arr/v))
+        reduce/r]
    [--> (in-hole E (op arr ...))
         (in-hole E (apply-op op (arr ...)))
         (side-condition (equal? (term (fun-rank op))
                                 (term  ((rank arr) ...))))
         op]
-   [--> (in-hole E ((λ [(var num) ...] expr) arr ...))
-        (in-hole E (subst [(var arr) ...] expr))
-        (side-condition (term (all ((at-rank? num arr) ...))))
+   [--> (in-hole E ((λ [(var num) ...] expr) arr/b ...))
+        (in-hole E (subst [(var arr/b) ...] expr))
+        (side-condition (term (all ((at-rank? num arr/b) ...))))
         apply]
-   [--> (in-hole E (fun arr ...))
-        (in-hole E (array-map fun (arr ...)))
+   [--> (in-hole E (fun arr/b ...))
+        (in-hole E (array-map fun (arr/b ...)))
         (where (num_r ...) (fun-rank fun))
         ; arrays must all be overranked and by the same (nonzero) amount
-        (side-condition (term (all ((overrank? num_r arr) ...))))
-        (side-condition (term (same-overrank? [(num_r arr) ...])))
-        (side-condition (< 0 (length (term (arr ...)))))
+        (side-condition (term (all ((overrank? num_r arr/b) ...))))
+        (side-condition (term (same-overrank? [(num_r arr/b) ...])))
+        (side-condition (< 0 (length (term (arr/b ...)))))
         map]
-   [--> (in-hole E (fun arr ...))
-        (in-hole E (fun arr_lifted ...))
+   [--> (in-hole E (fun arr/b ...))
+        (in-hole E (fun arr/b_lifted ...))
         (where (natural_r ...) (fun-rank fun))
-        (where (arr_lifted ...) (frame-lift ([natural_r arr] ...)))
+        (where (arr/b_lifted ...) (frame-lift ([natural_r arr/b] ...)))
         ; arrays must be overranked by different amounts
-        (side-condition (not (term (same-overrank? [(natural_r arr) ...]))))
-        (side-condition (< 0 (length (term (arr ...)))))
+        (side-condition (not (term (same-overrank? [(natural_r arr/b) ...]))))
+        (side-condition (< 0 (length (term (arr/b ...)))))
         lift]
-   [--> (in-hole E (fun arr ...))
-        (in-hole E (fun_natrank arr ...))
+   [--> (in-hole E (fun arr/b ...))
+        (in-hole E (fun_natrank arr/b ...))
         (side-condition (not (andmap exact-nonnegative-integer?
                                      (term (fun-rank fun)))))
-        (where fun_natrank (naturalize-rank fun arr ...))
+        (where fun_natrank (naturalize-rank fun arr/b ...))
         naturalize]
-   [--> (in-hole E (A (num_f ...) (arr ...)))
+   [--> (in-hole E (A (num_f ...) (arr/v ...)))
         (in-hole E (A (num_f ... num_c ...) any_v))
-        (where any_v ,(foldr append '() (term ((value arr) ...))))
-        (where (num_c ...) (shape-of-all arr ...))
-        (where ((A (num ...) (base ...)) ...) (arr ...))
+        (where any_v ,(foldr append '() (term ((value arr/v) ...))))
+        (where (num_c ...) (shape-of-all arr/v ...))
+        (where ((A (num ...) (base ...)) ...) (arr/v ...))
         collapse]))
 
 
@@ -94,6 +103,33 @@
   scalar : num -> arr
   [(scalar num) (A () (num))])
 
+
+;; apply a function to a chain of arrays, i.e.
+;; arr_0 `fun` arr_1 `fun` arr_2 `fun` arr_3 `fun` ... `fun` arr_n
+(define-metafunction Arrays
+  chain-apply/r : fun (arr ...) -> expr
+  [(chain-apply/r fun ()) (id-element/r fun)]
+  [(chain-apply/r fun (arr)) arr]
+  [(chain-apply/r fun (arr_0 arr_1 ...))
+   (fun arr_0 (chain-apply/r fun (arr_1 ...)))])
+#;(define-metafunction Arrays
+  chain-apply/l : fun arr ... -> expr
+  [(chain-apply/l fun ()) (id-element/l fun)]
+  [(chain-apply/l fun (arr)) arr]
+  [(chain-apply/l fun (arr_0 ... arr_1))
+   (fun (chain-apply/r fun (arr_0 ...)) arr_1)])
+
+;; get the neutral/identity element of a function
+(define-metafunction Arrays
+  id-element/r : fun -> arr
+  [(id-element/r +) (scalar 0)]
+  [(id-element/r -) (scalar 0)]
+  [(id-element/r *) (scalar 1)]
+  [(id-element/r /) (scalar 1)])
+#;(define-metafunction Arrays
+  id-element/l : fun -> arr
+  [(id-element/l +) (scalar 0)]
+  [(id-element/l *) (scalar 1)])
 
 ;; rewrite a function to eliminate negative/infinite arg ranks
 (define-metafunction Arrays
@@ -136,7 +172,7 @@
    (where (num_funrank ...) (fun-rank fun))
    (where ((num_cellshape ...) ...)
           ((take-right/m (shape arr_arg) num_funrank) ...))
-   (where ((arr_cell ...) ...) ((cells (num_cellshape ...) arr_arg) ...))
+   (where ((arr_cell ...) ...) ((cells/shape (num_cellshape ...) arr_arg) ...))
    (where (num_frame ...) ,(drop-right (first (term ((shape arr_arg) ...)))
                                        (first (term (num_funrank ...)))))])
   
@@ -162,7 +198,8 @@
   [(fun-rank -) (0 0)]
   [(fun-rank *) (0 0)]
   [(fun-rank /) (0 0)]
-  [(fun-rank (λ [(var num) ...] expr)) (num ...)])
+  [(fun-rank (λ [(var num) ...] expr)) (num ...)]
+  [(fun-rank (reduce/r expr)) +inf.0])
 
 ;; capture-avoiding substitution
 (define-metafunction Arrays
@@ -346,20 +383,30 @@
   [(cell-values (num_cellshape ...) arr)
    ((base ...) ...)
    (where ((A (num ...) (base ...)) ...)
-          (cells (num_cellshape ...) arr))])
+          (cells/shape (num_cellshape ...) arr))])
 
 ;; split an array into cells
 (define-metafunction Arrays
   ; cell shape, array
-  cells : (num ...) arr -> (arr ...)
-  [(cells (num_cellshape ...) (A (num_arrshape ...) ())) ()]
-  [(cells (num_cellshape ...) (A (num_arrshape ...) (base ...)))
+  cells/shape : (num ...) arr -> (arr ...)
+  [(cells/shape (num_cellshape ...) (A (num_arrshape ...) ())) ()]
+  [(cells/shape (num_cellshape ...) (A (num_arrshape ...) (base ...)))
    ,(cons (term (A (num_cellshape ...) (take/m (base ...) num_cellsize)))
           ; drop one cell's elements from array, and split remaining elements
-          (term (cells (num_cellshape ...)
+          (term (cells/shape (num_cellshape ...)
                        (A (num_arrshape ...)
                           (drop/m (base ...) num_cellsize)))))
    (where num_cellsize ,(foldr * 1 (term (num_cellshape ...))))])
+(define-metafunction Arrays
+  ; cell rank, array
+  cells/rank : num arr -> (arr ...)
+  [(cells/rank natural arr)
+   (cells/shape (take-right/m (shape arr) natural) arr)]
+  [(cells/rank +inf.0 arr) (arr)]
+  [(cells/rank num_neg arr)
+   (cells/shape (drop/m (shape arr) ,(- (term num_neg))) arr)
+   (side-condition (and (exact-integer? (term num_neg))
+                        (negative? (term num_neg))))])
 
 ;; make sure all arrays can be lifted into required frame
 (define-metafunction Arrays
