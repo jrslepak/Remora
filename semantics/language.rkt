@@ -68,30 +68,39 @@
         apply]
    [--> (in-hole E (fun arr/b ...))
         (in-hole E (array-map fun (arr/b ...)))
-        (where (num_r ...) (fun-rank fun))
+        (where (num_rank ...) (fun-rank fun))
         ; arrays must all be overranked and by the same (nonzero) amount
-        (side-condition (term (all ((overrank? num_r arr/b) ...))))
-        (side-condition (term (same-overrank? [(num_r arr/b) ...])))
+        (side-condition (term (all ((overrank? num_rank arr/b) ...))))
+        (side-condition (term (same-overrank? [(num_rank arr/b) ...])))
         (side-condition (< 0 (length (term (arr/b ...)))))
+        ; require that mapping produce an array rather than #f (map error)
+        (side-condition (term (array-map fun (arr/b ...))))
         map]
    [--> (in-hole E (fun arr/b ...))
         (in-hole E (fun arr/b_lifted ...))
-        (where (natural_r ...) (fun-rank fun))
-        (where (arr/b_lifted ...) (frame-lift ([natural_r arr/b] ...)))
+        ; function must have natural rank
+        (where (natural_rank ...) (fun-rank fun))
         ; arrays must be overranked by different amounts
-        (side-condition (not (term (same-overrank? [(natural_r arr/b) ...]))))
+        (side-condition (not (term (same-overrank?
+                                    [(natural_rank arr/b) ...]))))
+        (where (arr/b_lifted ...) (frame-lift ([natural_rank arr/b] ...)))
         (side-condition (< 0 (length (term (arr/b ...)))))
         lift]
+   ; convert function with non-natural rank to natural rank (based on its args)
    [--> (in-hole E (fun arr/b ...))
         (in-hole E (fun_natrank arr/b ...))
         (side-condition (not (andmap exact-nonnegative-integer?
                                      (term (fun-rank fun)))))
         (where fun_natrank (naturalize-rank fun arr/b ...))
         naturalize]
-   [--> (in-hole E (A (num_f ...) (arr/v ...)))
-        (in-hole E (A (num_f ... num_c ...) any_v))
+   ; collapse an array-of-arrays into flat array
+   [--> (in-hole E (A (num_frame-dim ...) (arr/v ...)))
+        ; append cell shape onto frame shape
+        (in-hole E (A (num_frame-dim ... num_cell-dim ...) any_v))
+        ; TODO: tighten this pattern condition?
         (where any_v ,(foldr append '() (term ((value arr/v) ...))))
-        (where (num_c ...) (shape-of-all arr/v ...))
+        ; all cells must have the same shape
+        (where (num_cell-dim ...) (shape-of-all arr/v ...))
         (where ((A (num ...) (base ...)) ...) (arr/v ...))
         collapse]))
 
@@ -141,7 +150,6 @@
   natural-cell-rank : num arr -> num
   [(natural-cell-rank natural arr) natural]
   [(natural-cell-rank +inf.0 arr) (rank arr)]
-  ; TODO: some of this code is duplicated elsewhere -- clean that up
   [(natural-cell-rank num_neg arr) ,(+ (term (rank arr)) (term num_neg))])
 
 ;; get the shape of all given arrays, or return #f if not all are the same
@@ -158,23 +166,24 @@
 ;; map a function over the cells of its arguments
 ;; only use after all arrays have been lifted into same frame
 (define-metafunction Arrays
-  array-map : fun (arr ...) -> arr
-  ;[(array-map fun ())]
+  array-map : fun (arr ...) -> arr or #f
   [(array-map fun (arr_arg ...))
    ; break array into cells, construct array whose value is the computations
    ; from the function mapping
-   
-   (A (num_frame ...)
-      (cell-apply fun ((arr_cell ...) ...))
-      #;,(apply (λ (c) (map (λ (x) (cons (term fun) x))))
-              (term ((fun arr_cell ...) ...))))
-   
-   (where (num_funrank ...) (fun-rank fun))
-   (where ((num_cellshape ...) ...)
-          ((take-right/m (shape arr_arg) num_funrank) ...))
-   (where ((arr_cell ...) ...) ((cells/shape (num_cellshape ...) arr_arg) ...))
-   (where (num_frame ...) ,(drop-right (first (term ((shape arr_arg) ...)))
-                                       (first (term (num_funrank ...)))))])
+   (A (num_framedim ...)
+      (cell-apply fun ((arr_cell ...) ...)))
+   (where (num_fun-rank ...) (fun-rank fun))
+   (where ((num_cell-dim ...) ...)
+          ((take-right/m (shape arr_arg) num_fun-rank) ...))
+   (where ((arr_cell ...) ...) ((cells/shape (num_cell-dim ...) arr_arg) ...))
+   (where (num_framedim ...) ,(drop-right (first (term ((shape arr_arg) ...)))
+                                          (first (term (num_fun-rank ...)))))
+   ; make sure all things are being mapped over the same frame
+   (where ((num_frame-dim ...) ...)
+          ((drop-right/m (shape arr_arg) num_fun-rank) ...))
+   (side-condition (term (all-equal? ((num_frame-dim ...) ...))))]
+  ; did not meet conditions for mapping -> return #f
+  [(array-map fun (arr_arg ...)) #f])
   
 ;; set up function application for each cell group (1st cells, 2nd cells, etc.)
 (define-metafunction Arrays
@@ -182,14 +191,21 @@
   [(cell-apply fun ()) ()]
   [(cell-apply fun (() ...)) ()]
   [(cell-apply fun ((arr ...) ...))
+   ; TODO: why cons? better to do this with pattern
    ,(cons (cons (term fun) (map first (term ((arr ...) ...))))
-         (term (cell-apply fun ,(map rest (term ((arr ...) ...))))))])
+          (term (cell-apply fun ,(map rest (term ((arr ...) ...))))))])
 
 ;; apply a builtin operator
 (define-metafunction Arrays
   apply-op : op (arr ...) -> arr
   [(apply-op + ((A () (num_1)) (A () (num_2))))
-   (A () (,(+ (term num_1) (term num_2))))])
+   (A () (,(+ (term num_1) (term num_2))))]
+  [(apply-op - ((A () (num_1)) (A () (num_2))))
+   (A () (,(- (term num_1) (term num_2))))]
+  [(apply-op * ((A () (num_1)) (A () (num_2))))
+   (A () (,(* (term num_1) (term num_2))))]
+  [(apply-op / ((A () (num_1)) (A () (num_2))))
+   (A () (,(/ (term num_1) (term num_2))))])
 
 ;; extract or look up ranks of a function
 (define-metafunction Arrays
@@ -303,70 +319,56 @@
   [(value (A (num ...) (expr ...))) (expr ...)])
 
 ;; grow argument arrays by duplication so they all have their desired ranks
-;; frame-lift preprocesses input by converting infinite/negative cell ranks
-;; to natural rank -- actual array growth is handled by frame-lift*
+;; cell ranks must be naturalized
 (define-metafunction Arrays
   ; [(cell-rank array) ...]
-  frame-lift : [(num arr) ...] -> (arr ...)
-  [(frame-lift [(natural arr) ...]) (frame-lift* [(natural arr) ...])]
-  [(frame-lift [(natural_0 arr_0) ... (+inf.0 arr_1) (num_2 arr_2) ...])
-   (frame-lift [(natural_0 arr_0) ... ((rank arr_1) arr_1) (num_2 arr_2) ...])]
-  [(frame-lift [(natural_0 arr_0) ... (num_neg arr_1) (num_2 arr_2) ...])
-   (frame-lift [(natural_0 arr_0) ... (num_nat arr_1) (num_2 arr_2) ...])
-   (side-condition (and (exact-integer? (term num_neg))
-                        (negative? (term num_neg))))
-   (where num_nat (natural-cell-rank num_neg arr_1))])
-(define-metafunction Arrays
-  ; [(cell-rank array) ...]
-  frame-lift* : [(num arr) ...] -> (arr ...)
-  [(frame-lift* []) ()]
+  frame-lift : [(num arr) ...] -> (arr ...) or #f
+  [(frame-lift []) ()]
   ; make sure arrays can be lifted into same frame
   ; (need prefix relation for frame shapes)
   ; "principal frame" comes from least-overranked array
-  [(frame-lift* [(num_cr arr) ...])
-   ((cell-dup num_cr (num_pfr ...) arr) ...)
+  [(frame-lift [(num_cr arr) ...])
+   ((cell-dup num_cr (num_pr-frame-dim ...) arr) ...)
    ; extract frame shapes
    (where ((num_fr ...) ...)
           ((drop-right/m (shape arr) num_cr) ...))
    ; find the longest one -- that is the principal frame
-   (where (num_pfr ...) (longest ((num_fr ...) ...)))
+   (where (num_pr-frame-dim ...) (longest ((num_fr ...) ...)))
    ; all other frames must be prefixes of it
-   (side-condition (term (all ((prefix? (num_fr ...) (num_pfr ...)) ...))))])
+   (side-condition
+    (term (all ((prefix? (num_fr ...) (num_pr-frame-dim ...)) ...))))]
+  ; not a frame-liftable input (e.g. due to frame mismatch)
+  [(frame-lift any) #f])
 
 ;; duplicate cells of given array to lift it into desired frame
 (define-metafunction Arrays
   ; cell rank, frame shape, initial array
   cell-dup : num (num ...) arr -> arr
-  #;[(cell-dup num_cr (num_fs ...) arr)
-     arr
-     (side-condition (= (term num_cr)
-                        (term (rank arr))))]
   ; All elements of a single cell should appear consecutively in value segment
   ; Just split value into chunks, repeat chunks right number of times, and
   ; update the shape.
-  [(cell-dup num_cr (num_fs ...) arr)
+  [(cell-dup num_cell-rank (num_frame-dim ...) arr)
    ; new array's shape is frame-portion ++ growth-portion ++ cell-shape
    ; new array's value comes from repeating the cells (number of copies is
    ; product of the "growth" portion of the shape)
-   (A ,(append (term (drop-right/m (shape arr) num_cr))
+   (A ,(append (term (drop-right/m (shape arr) num_cell-rank))
                (term (num_growth ...))
-               (term (take-right/m (shape arr) num_cr)))
+               (term (take-right/m (shape arr) num_cell-rank)))
       ,(foldr append '()
               (term ((repeat ,(foldr * 1 (term (num_growth ...)))
                              (base_cell ...)) ...))))
    ; break the array's value segment into its cells
    (where ((base_cell ...) ...)
-          (cell-values (take-right/m (shape arr) num_cr)
-                       arr))
+          (cell-values (take-right/m (shape arr) num_cell-rank) arr))
    ; identify the part of the result shape that comes from lifting
    ; drop frame portion of array from left side of frame
    (where (num_growth ...)
-          (drop/m (num_fs ...)
-                  ,(- (term (rank arr)) (term num_cr))))
+          (drop/m (num_frame-dim ...)
+                  ,(- (term (rank arr)) (term num_cell-rank))))
    ; require that the array actually be liftable into the frame
    ; i.e. frame portion of array must be prefix of given frame
-   (side-condition (term (prefix? (drop-right/m (shape arr) num_cr)
-                                  (num_fs ...))))])
+   (side-condition (term (prefix? (drop-right/m (shape arr) num_cell-rank)
+                                  (num_frame-dim ...))))])
 
 ;; repeat the list the given number of times
 (define-metafunction Arrays
@@ -389,14 +391,14 @@
 (define-metafunction Arrays
   ; cell shape, array
   cells/shape : (num ...) arr -> (arr ...)
-  [(cells/shape (num_cellshape ...) (A (num_arrshape ...) ())) ()]
-  [(cells/shape (num_cellshape ...) (A (num_arrshape ...) (base ...)))
-   ,(cons (term (A (num_cellshape ...) (take/m (base ...) num_cellsize)))
+  [(cells/shape (num_cell-dim ...) (A (num_arr-dim ...) ())) ()]
+  [(cells/shape (num_cell-dim ...) (A (num_arr-dim ...) (base ...)))
+   ,(cons (term (A (num_cell-dim ...) (take/m (base ...) num_cellsize)))
           ; drop one cell's elements from array, and split remaining elements
-          (term (cells/shape (num_cellshape ...)
-                       (A (num_arrshape ...)
+          (term (cells/shape (num_cell-dim ...)
+                       (A (num_arr-dim ...)
                           (drop/m (base ...) num_cellsize)))))
-   (where num_cellsize ,(foldr * 1 (term (num_cellshape ...))))])
+   (where num_cellsize ,(foldr * 1 (term (num_cell-dim ...))))])
 (define-metafunction Arrays
   ; cell rank, array
   cells/rank : num arr -> (arr ...)
@@ -412,9 +414,9 @@
 (define-metafunction Arrays
   frame-match : [(num arr) ...] -> bool
   [(frame-match [(num arr) ...])
-   (all [(prefix? (num_shape ...) any_maxframe) ...])
-   (where ((num_shape ...) ...) (frame-shapes [(num arr) ...]))
-   (where any_maxframe (longest (frame-shapes [(num arr) ...])))])
+   (all [(prefix? (num_arr-dim ...) (num_frame-dim ...)) ...])
+   (where ((num_arr-dim ...) ...) (frame-shapes [(num arr) ...]))
+   (where (num_frame-dim ...) (longest (frame-shapes [(num arr) ...])))])
 
 ;; find the frame component of the arrays' shapes
 (define-metafunction Arrays
@@ -452,6 +454,16 @@
   [(suffix? (any_2 ...) (any_1 ... any_2 ...)) #t]
   [(suffix? (any_1 ...) (any_2 ...)) #f])
 
+;; check that all list entries are the same
+(define-metafunction Arrays
+  all-equal? : (any ...) -> bool
+  [(all-equal? ()) #t]
+  [(all-equal? (any)) #t]
+  [(all-equal? (any_1 any_1 any_2 ...))
+   ,(and (term (all-equal? (any_1 any_2 ...))))]
+  [(all-equal? any) #f])
+
+; TODO: macro for generating metafunction from builting racket function
 ;; metafunction wrapper for existing take function
 (define-metafunction Arrays
   take/m : (any ...) num -> (any ...)
@@ -525,5 +537,20 @@
                                     (A (3) (10 20 30)))))
   (term ((A (3 3) (11 22 33
                    14 25 36
-                   17 28 39))))))
+                   17 28 39)))))
+ 
+ (check-equal?
+  (apply-reduction-relation
+   ->Array
+   (term (+ (A (6) (1 2 3 4 5 6))
+            (A (3) (10 20 30)))))
+  '())
+ 
+ (check-equal?
+  (apply-reduction-relation
+   ->Array
+   (term (+ (A (2 3) (1 2 3
+                      4 5 6))
+            (A (3) (10 20 30)))))
+  '()))
 
