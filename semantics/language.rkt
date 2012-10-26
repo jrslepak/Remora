@@ -293,13 +293,7 @@
 ;; make sure all arrays are overranked by the same amount
 (define-metafunction Arrays
   same-overrank? : [(num arr) ...] -> bool
-  [(same-overrank? []) #t]
-  [(same-overrank? [(num arr)]) #t]
-  [(same-overrank? [(num_1 arr_1) (num_2 arr_2) (num_3 arr_3) ...])
-   (same-overrank? [(num_2 arr_2) (num_3 arr_3) ...])
-   (side-condition (= (term (overrank num_1 arr_1))
-                      (term (overrank num_2 arr_2))))]
-  [(same-overrank? [(num_1 arr_1) (num_2 arr_2) (num_3 arr_3) ...]) #f])
+  [(same-overrank? [(num arr) ...]) (all-equal? ((overrank num arr) ...))])
   
 
 ;; extract rank of array
