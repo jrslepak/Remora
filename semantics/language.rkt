@@ -534,6 +534,24 @@
                    17 28 39)))))
  
  (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ((reduce/r +)
+          (A (3 3) (1 2 3
+                    4 5 6
+                    7 8 9)))))
+  (term ((A (3) (12 15 18)))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x 1]) ((reduce/r +) x))
+          (A (3 3) (1 2 3
+                    4 5 6
+                    7 8 9)))))
+  (term ((A (3) (6 15 24)))))
+ 
+ (check-equal?
   (apply-reduction-relation
    ->Array
    (term (+ (A (6) (1 2 3 4 5 6))
