@@ -57,6 +57,14 @@
         (in-hole E (chain-apply/r fun (arr/v_cell ...)))
         (where (arr/v_cell ...) (cells/rank -1 arr/v))
         reduce/r]
+   [--> (in-hole E ((fold/r fun arr/b) arr/v))
+        (in-hole E (chain-apply/r fun (arr/v_cell ... arr/b)))
+        (where (arr/v_cell ...) (cells/rank -1 arr/v))
+        fold/r]
+   [--> (in-hole E ((fold/l fun arr/b) arr/v))
+        (in-hole E (chain-apply/l fun (arr/b arr/v_cell ...)))
+        (where (arr/v_cell ...) (cells/rank -1 arr/v))
+        fold/l]
    [--> (in-hole E (op arr ...))
         (in-hole E (apply-op op (arr ...)))
         (side-condition (equal? (term (fun-rank op))
@@ -121,12 +129,12 @@
   [(chain-apply/r fun (arr)) arr]
   [(chain-apply/r fun (arr_0 arr_1 ...))
    (fun arr_0 (chain-apply/r fun (arr_1 ...)))])
-#;(define-metafunction Arrays
-  chain-apply/l : fun arr ... -> expr
+(define-metafunction Arrays
+  chain-apply/l : fun (arr ...) -> expr
   [(chain-apply/l fun ()) (id-element/l fun)]
   [(chain-apply/l fun (arr)) arr]
   [(chain-apply/l fun (arr_0 ... arr_1))
-   (fun (chain-apply/r fun (arr_0 ...)) arr_1)])
+   (fun (chain-apply/l fun (arr_0 ...)) arr_1)])
 
 ;; get the neutral/identity element of a function
 (define-metafunction Arrays
@@ -135,7 +143,7 @@
   [(id-element/r -) (scalar 0)]
   [(id-element/r *) (scalar 1)]
   [(id-element/r /) (scalar 1)])
-#;(define-metafunction Arrays
+(define-metafunction Arrays
   id-element/l : fun -> arr
   [(id-element/l +) (scalar 0)]
   [(id-element/l *) (scalar 1)])
@@ -550,6 +558,20 @@
                     4 5 6
                     7 8 9)))))
   (term ((A (3) (6 15 24)))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ((fold/r - (scalar 0))
+          (A (4) (1 1 1 1)))))
+  (term ((A () (0)))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ((fold/l - (scalar 0))
+          (A (4) (1 1 1 1)))))
+  (term ((A () (-4)))))
  
  (check-equal?
   (apply-reduction-relation
