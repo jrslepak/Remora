@@ -360,9 +360,9 @@
                (term (take-right/m (shape arr) num_cell-rank)))
       ,(foldr append '()
               (term ((repeat ,(foldr * 1 (term (num_growth ...)))
-                             (base_cell ...)) ...))))
+                             (expr_cell ...)) ...))))
    ; break the array's value segment into its cells
-   (where ((base_cell ...) ...)
+   (where ((expr_cell ...) ...)
           (cell-values (take-right/m (shape arr) num_cell-rank) arr))
    ; identify the part of the result shape that comes from lifting
    ; drop frame portion of array from left side of frame
@@ -385,10 +385,10 @@
 ;; extract the value segments of an array's cells
 (define-metafunction Arrays
   ; cell shape, array
-  cell-values : (num ...) arr -> ((base ...) ...)
+  cell-values : (num ...) arr -> ((expr ...) ...)
   [(cell-values (num_cellshape ...) arr)
-   ((base ...) ...)
-   (where ((A (num ...) (base ...)) ...)
+   ((expr ...) ...)
+   (where ((A (num ...) (expr ...)) ...)
           (cells/shape (num_cellshape ...) arr))])
 
 ;; split an array into cells
@@ -396,12 +396,12 @@
   ; cell shape, array
   cells/shape : (num ...) arr -> (arr ...)
   [(cells/shape (num_cell-dim ...) (A (num_arr-dim ...) ())) ()]
-  [(cells/shape (num_cell-dim ...) (A (num_arr-dim ...) (base ...)))
-   ,(cons (term (A (num_cell-dim ...) (take/m (base ...) num_cellsize)))
+  [(cells/shape (num_cell-dim ...) (A (num_arr-dim ...) (expr ...)))
+   ,(cons (term (A (num_cell-dim ...) (take/m (expr ...) num_cellsize)))
           ; drop one cell's elements from array, and split remaining elements
           (term (cells/shape (num_cell-dim ...)
                        (A (num_arr-dim ...)
-                          (drop/m (base ...) num_cellsize)))))
+                          (drop/m (expr ...) num_cellsize)))))
    (where num_cellsize ,(foldr * 1 (term (num_cell-dim ...))))])
 (define-metafunction Arrays
   ; cell rank, array
@@ -425,7 +425,7 @@
 ;; find the frame component of the arrays' shapes
 (define-metafunction Arrays
   frame-shapes : [(num arr) ...] -> [(num ...) ...]
-  [(frame-shapes [(num_cellrank (A (num_shape ...) (base ...))) ...])
+  [(frame-shapes [(num_cellrank (A (num_shape ...) (expr ...))) ...])
    ; can't just use
    ; [,(drop-right (term num_rank) (term (num_shape ...))) ...]
    ; because it doesn't associate num_rank with the last ...
