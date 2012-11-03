@@ -18,9 +18,11 @@
   ; also include nested vector representation?
   (arr (A (num ...) (expr ...))) ; flat representation, shape and values
   
-  (arr/v (A (num ...) (elt ...))) ; pseudo-value form -- no app forms inside
-  (elt arr/v base)
-  (arr/b (A (num ...) (base ...))) ; value form -- only base data inside
+  (arr/pv (A (num ...) (elt ...))) ; pseudo-value form -- no app forms inside
+  (elt arr/pv val base)
+  (arr/v arr/b arr/f) ; value form -- only base data or functions inside
+  (arr/b (A (num ...) (base ...)))
+  (arr/f (A (num ...) (fun ...)))
   
   ; builtin operators
   (op + - * /
@@ -37,7 +39,7 @@
   ; value forms
   (val (λ [(var num) ...] expr)
        op
-       arr/b)
+       arr/v)
   
   ; evaluation contexts
   (E hole
@@ -53,63 +55,63 @@
   (reduction-relation
    Arrays
    #:domain expr
-   [--> (in-hole E ((reduce/r fun) arr/v))
-        (in-hole E (chain-apply/r fun (arr/v_cell ...)))
-        (where (arr/v_cell ...) (cells/rank -1 arr/v))
+   [--> (in-hole E ((reduce/r fun) arr/pv))
+        (in-hole E (chain-apply/r fun (arr/pv_cell ...)))
+        (where (arr/pv_cell ...) (cells/rank -1 arr/pv))
         reduce/r]
-   [--> (in-hole E ((fold/r fun arr/b) arr/v))
-        (in-hole E (chain-apply/r fun (arr/v_cell ... arr/b)))
-        (where (arr/v_cell ...) (cells/rank -1 arr/v))
+   [--> (in-hole E ((fold/r fun arr/v) arr/pv))
+        (in-hole E (chain-apply/r fun (arr/pv_cell ... arr/v)))
+        (where (arr/pv_cell ...) (cells/rank -1 arr/pv))
         fold/r]
-   [--> (in-hole E ((fold/l fun arr/b) arr/v))
-        (in-hole E (chain-apply/l fun (arr/b arr/v_cell ...)))
-        (where (arr/v_cell ...) (cells/rank -1 arr/v))
+   [--> (in-hole E ((fold/l fun arr/v) arr/pv))
+        (in-hole E (chain-apply/l fun (arr/v arr/pv_cell ...)))
+        (where (arr/pv_cell ...) (cells/rank -1 arr/pv))
         fold/l]
    [--> (in-hole E (op arr ...))
         (in-hole E (apply-op op (arr ...)))
         (side-condition (equal? (term (fun-rank op))
                                 (term  ((rank arr) ...))))
         op]
-   [--> (in-hole E ((λ [(var num) ...] expr) arr/b ...))
-        (in-hole E (subst [(var arr/b) ...] expr))
-        (side-condition (term (all ((at-rank? num arr/b) ...))))
+   [--> (in-hole E ((λ [(var num) ...] expr) arr/v ...))
+        (in-hole E (subst [(var arr/v) ...] expr))
+        (side-condition (term (all ((at-rank? num arr/v) ...))))
         apply]
-   [--> (in-hole E (fun arr/b ...))
-        (in-hole E (array-map fun (arr/b ...)))
+   [--> (in-hole E (fun arr/v ...))
+        (in-hole E (array-map fun (arr/v ...)))
         (where (num_rank ...) (fun-rank fun))
         ; arrays must all be overranked and by the same (nonzero) amount
-        (side-condition (term (all ((overrank? num_rank arr/b) ...))))
-        (side-condition (term (same-overrank? [(num_rank arr/b) ...])))
-        (side-condition (< 0 (length (term (arr/b ...)))))
+        (side-condition (term (all ((overrank? num_rank arr/v) ...))))
+        (side-condition (term (same-overrank? [(num_rank arr/v) ...])))
+        (side-condition (< 0 (length (term (arr/v ...)))))
         ; require that mapping produce an array rather than #f (map error)
-        (side-condition (term (array-map fun (arr/b ...))))
+        (side-condition (term (array-map fun (arr/v ...))))
         map]
-   [--> (in-hole E (fun arr/b ...))
-        (in-hole E (fun arr/b_lifted ...))
+   [--> (in-hole E (fun arr/v ...))
+        (in-hole E (fun arr/v_lifted ...))
         ; function must have natural rank
         (where (natural_rank ...) (fun-rank fun))
         ; arrays must be overranked by different amounts
         (side-condition (not (term (same-overrank?
-                                    [(natural_rank arr/b) ...]))))
-        (where (arr/b_lifted ...) (frame-lift ([natural_rank arr/b] ...)))
-        (side-condition (< 0 (length (term (arr/b ...)))))
+                                    [(natural_rank arr/v) ...]))))
+        (where (arr/v_lifted ...) (frame-lift ([natural_rank arr/v] ...)))
+        (side-condition (< 0 (length (term (arr/v ...)))))
         lift]
    ; convert function with non-natural rank to natural rank (based on its args)
-   [--> (in-hole E (fun arr/b ...))
-        (in-hole E (fun_natrank arr/b ...))
+   [--> (in-hole E (fun arr/v ...))
+        (in-hole E (fun_natrank arr/v ...))
         (side-condition (not (andmap exact-nonnegative-integer?
                                      (term (fun-rank fun)))))
-        (where fun_natrank (naturalize-rank fun arr/b ...))
+        (where fun_natrank (naturalize-rank fun arr/v ...))
         naturalize]
    ; collapse an array-of-arrays into flat array
-   [--> (in-hole E (A (num_frame-dim ...) (arr/v ...)))
+   [--> (in-hole E (A (num_frame-dim ...) (arr/pv ...)))
         ; append cell shape onto frame shape
         (in-hole E (A (num_frame-dim ... num_cell-dim ...) any_v))
         ; TODO: tighten this pattern condition?
-        (where any_v ,(foldr append '() (term ((value arr/v) ...))))
+        (where any_v ,(foldr append '() (term ((value arr/pv) ...))))
         ; all cells must have the same shape
-        (where (num_cell-dim ...) (shape-of-all arr/v ...))
-        (where ((A (num ...) (base ...)) ...) (arr/v ...))
+        (where (num_cell-dim ...) (shape-of-all arr/pv ...))
+        (where ((A (num ...) (base ...)) ...) (arr/pv ...))
         collapse]))
 
 
