@@ -76,6 +76,23 @@
         (in-hole E (subst [(var arr/v) ...] expr))
         (side-condition (term (all ((at-rank? num arr/v) ...))))
         apply]
+   [--> (in-hole E (arr/f arr/v ...))
+        (in-hole E (arr/f_lifted arr/v_lifted ...))
+        ; require a nonempty array of functions
+        (where (A (num_fundim ...) (fun_0 fun_1 ...)) arr/f)
+        ; all functions in array must have same expected ranks
+        (side-condition (term (all-equal? ((fun-rank fun_0)
+                                           (fun-rank fun_1) ...))))
+        ; must find natural rank
+        (where (natural_funrank ...) (fun-rank fun_0))
+        ; the effective expected rank of `apply' is now (0 num_funrank ...)
+        ; ensure they don't all have the same overrank
+        (side-condition (not (term (same-overrank?
+                                    [(0 arr/f) (natural_funrank arr/v) ...]))))
+        ; break arr/f into 0-cells, arr/v into num_funrank-cells
+        (where (arr/f_lifted arr/v_lifted ...)
+               (frame-lift ([0 arr/f] [natural_funrank arr/v] ...)))
+        arr/f-lift]
    [--> (in-hole E (fun arr/v ...))
         (in-hole E (array-map fun (arr/v ...)))
         (where (num_rank ...) (fun-rank fun))
