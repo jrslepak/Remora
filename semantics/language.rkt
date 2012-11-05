@@ -77,6 +77,27 @@
         (side-condition (term (all ((at-rank? num arr/v) ...))))
         apply]
    [--> (in-hole E (arr/f arr/v ...))
+        (in-hole E 
+                 (A (shape arr/f) ((fun arr/v_cell ...) ...)))
+        ; require a nonempty array of functions
+        (where (A (num_fundim ...) (fun_0 fun_1 ...)) arr/f)
+        ; all functions in array must have same expected ranks
+        (side-condition (term (all-equal? ((fun-rank fun_0)
+                                           (fun-rank fun_1) ...))))
+        ; must find natural rank
+        (where (natural_funrank ...) (fun-rank fun_0))
+        ; ensure they are all overranked by the same amount
+        (side-condition (term (same-overrank?
+                               [(0 arr/f) (natural_funrank arr/v) ...])))
+        (side-condition (term (all ((overrank? 0 arr/f)
+                                    (overrank? natural_funrank arr/v) ...))))
+        
+        (where ((A () (fun)) ...) (cells/rank 0 arr/f))
+        (where ((arr/v_cell ...) ...)
+               (transpose ((cells/rank natural_funrank arr/v) ...)))
+        
+        arr/f-map]
+   [--> (in-hole E (arr/f arr/v ...))
         (in-hole E (arr/f_lifted arr/v_lifted ...))
         ; require a nonempty array of functions
         (where (A (num_fundim ...) (fun_0 fun_1 ...)) arr/f)
@@ -521,6 +542,15 @@
   [(all (#t ...)) #t]
   [(all any) #f])
 
+;; transpose ((x_1,1 x_1,2 ...) (x_2,1 x_2,2 ...) ...)
+;; to ((x_1,1 x_2,1 ...) (x_1,2 x_2,2 ...) ...)
+(define-metafunction Arrays
+  transpose : ((any ...) ...) -> ((any ...) ...)
+  [(transpose ()) ()]
+  [(transpose (() ...)) ()]
+  [(transpose ((any_0 any_1 ...) ...))
+   ,(cons (term (any_0 ...))
+          (term (transpose ((any_1 ...) ...))))])
 
 
 (module+
@@ -560,6 +590,7 @@
                    14 25 36
                    17 28 39)))))
  
+ ; reducing/folding along different axes/directions
  (check-equal?
   (apply-reduction-relation*
    ->Array
@@ -592,6 +623,7 @@
           (A (4) (1 1 1 1)))))
   (term ((A () (-4)))))
  
+ ; some terms which should not be reducible (due to shape mismatch)
  (check-equal?
   (apply-reduction-relation
    ->Array
@@ -605,5 +637,41 @@
    (term (+ (A (2 3) (1 2 3
                       4 5 6))
             (A (3) (10 20 30)))))
-  '()))
+  '())
+ 
+ ; make sure currying doesn't change how lifting works
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (((λ ([x 0]) (λ ([y 0]) (+ x y))) (A () (5))) (A () (10)))))
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x 0] [y 0]) (+ x y)) (A () (5)) (A () (10))))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (((λ ([x 0]) (λ ([y 0]) (+ x y)))
+           (A () (5)))
+          (A (2) (10 20)))))
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x 0] [y 0]) (+ x y)) (A () (5)) (A (2) (10 20))))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (((λ ([x 0]) (λ ([y 0]) (+ x y)))
+           (A (2 2) (1 2
+                     3 4)))
+          (A (2) (10 20)))))
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x 0] [y 0]) (+ x y))
+          (A (2 2) (1 2
+                    3 4))
+          (A (2) (10 20))))))
+ 
+ 
+ )
 
