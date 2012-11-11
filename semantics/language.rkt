@@ -12,7 +12,8 @@
   
   ; functions may be builtin or user-defined
   (fun (λ [(var num) ...] expr)
-       op)
+       op
+       c-op)
   
   ; syntax for writing arrays
   ; also include nested vector representation?
@@ -25,8 +26,11 @@
   (arr/f (A (num ...) (fun ...)))
   
   ; builtin operators
-  (op + - * /
-      reduce/r)
+  (op + - * /)
+  ; curried builtins
+  (c-op reduce
+        fold/l
+        fold/r)
   
   ; variables
   (var variable-not-otherwise-mentioned)
@@ -55,10 +59,11 @@
   (reduction-relation
    Arrays
    #:domain expr
-   [--> (in-hole E ((reduce/r fun) arr/pv))
+   ; TODO: change reduce to do a divide-and-conquer pattern
+   [--> (in-hole E ((reduce fun) arr/pv))
         (in-hole E (chain-apply/r fun (arr/pv_cell ...)))
         (where (arr/pv_cell ...) (cells/rank -1 arr/pv))
-        reduce/r]
+        reduce]
    [--> (in-hole E ((fold/r fun arr/v) arr/pv))
         (in-hole E (chain-apply/r fun (arr/pv_cell ... arr/v)))
         (where (arr/pv_cell ...) (cells/rank -1 arr/pv))
@@ -84,10 +89,17 @@
         ; all functions in array must have same expected ranks
         (side-condition (term (all-equal? ((fun-rank fun_0)
                                            (fun-rank fun_1) ...))))
-        ; must find natural rank
-        (where (natural_funrank ...) (fun-rank fun_0))
+        ; all functions in array must have same expected ranks
+        (side-condition (term (all-equal? ((fun-rank fun_0)
+                                           (fun-rank fun_1) ...))))
+        ; and that rank must be natural
+        (where (natural_funrank ...)
+               (fun-rank fun_0))
         ; ensure they are all overranked by the same amount
         (side-condition (term (same-overrank?
+                               ; TODO: this will never match if cells expect
+                               ; negative or infinite rank -- need too add a
+                               ; naturalization step
                                [(0 arr/f) (natural_funrank arr/v) ...])))
         (side-condition (term (all ((overrank? 0 arr/f)
                                     (overrank? natural_funrank arr/v) ...))))
@@ -95,8 +107,16 @@
         (where ((A () (fun)) ...) (cells/rank 0 arr/f))
         (where ((arr/v_cell ...) ...)
                (transpose ((cells/rank natural_funrank arr/v) ...)))
-        
         arr/f-map]
+   [--> (in-hole E (arr/f arr/v ...))
+        (in-hole E (arr/f_natrank arr/v ...))
+        (where (A (num_dim ...) (fun ...)) arr/f)
+        
+        (side-condition (not (redex-match Arrays ((natural ...) ...)
+                                          (term ((fun-rank fun) ...)))))
+        (where (fun_natrank ...) ((naturalize-rank fun arr/v ...) ...))
+        (where arr/f_natrank (A (num_dim ...) (fun_natrank ...)))
+        arr/f-naturalize]
    [--> (in-hole E (arr/f arr/v ...))
         (in-hole E (arr/f_lifted arr/v_lifted ...))
         ; require a nonempty array of functions
@@ -263,13 +283,15 @@
   [(fun-rank *) (0 0)]
   [(fun-rank /) (0 0)]
   [(fun-rank (λ [(var num) ...] expr)) (num ...)]
-  [(fun-rank (reduce/r expr)) +inf.0])
+  [(fun-rank reduce) +inf.0]
+  [(fun-rank (reduce expr)) +inf.0])
 
 ;; capture-avoiding substitution
 (define-metafunction Arrays
   subst : [(var expr) ...] expr -> expr
   [(subst [(var expr) ...] base) base]
   [(subst [(var expr) ...] op) op]
+  [(subst [(var expr) ...] c-op) c-op]
   [(subst [(var expr) ...] (A (num_sh ...) (expr_val ...)))
    (A (num_sh ...) ((subst [(var expr) ...] expr_val) ...))]
   [(subst [(var expr) ...] (op expr_arg ...))
@@ -594,7 +616,7 @@
  (check-equal?
   (apply-reduction-relation*
    ->Array
-   (term ((reduce/r +)
+   (term ((reduce +)
           (A (3 3) (1 2 3
                     4 5 6
                     7 8 9)))))
@@ -603,7 +625,7 @@
  (check-equal?
   (apply-reduction-relation*
    ->Array
-   (term ((λ ([x 1]) ((reduce/r +) x))
+   (term ((λ ([x 1]) ((reduce +) x))
           (A (3 3) (1 2 3
                     4 5 6
                     7 8 9)))))
@@ -672,6 +694,86 @@
                     3 4))
           (A (2) (10 20))))))
  
+ ; check that arrays of functions with non-natural rank get applied properly
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ((A (2) ((λ ([x +inf.0]) (* (scalar 10) x))
+                  (λ ([x +inf.0]) (- x (scalar 5)))))
+          (A (4) (1 2 3 4)))))
+  (term ((A (2 4) (10 20 30 40
+                   -4 -3 -2 -1)))))
  
- )
+ ; currying with non-natural rank
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (((λ ([x 0]) (λ ([y -1]) (+ x y)))
+           (A (2) (1 2)))
+          (A (2 2) (10 20 30 40)))))
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x 0][y -1]) (+ x y))
+          (A (2) (1 2))
+          (A (2 2) (10 20 30 40))))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (((λ ([x -1]) (λ ([y 0]) (+ x y)))
+           (A (2) (1 2)))
+          (A (2 2) (10 20 30 40)))))
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x -1][y 0]) (+ x y))
+          (A (2) (1 2))
+          (A (2 2) (10 20 30 40))))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (((λ ([x 0]) (λ ([y +inf.0]) (+ x y)))
+           (A (2) (1 2)))
+          (A (2 2) (10 20 30 40)))))
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x 0][y +inf.0]) (+ x y))
+          (A (2) (1 2))
+          (A (2 2) (10 20 30 40))))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (((λ ([x -1]) (λ ([y +inf.0]) (+ x y)))
+           (A (2) (1 2)))
+          (A (2 2) (10 20 30 40)))))
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x -1][y +inf.0]) (+ x y))
+          (A (2) (1 2))
+          (A (2 2) (10 20 30 40))))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (((λ ([x +inf.0]) (λ ([y 0]) (+ x y)))
+           (A (2) (1 2)))
+          (A (2 2) (10 20 30 40)))))
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x +inf.0][y 0]) (+ x y))
+          (A (2) (1 2))
+          (A (2 2) (10 20 30 40))))))
+ 
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (((λ ([x +inf.0]) (λ ([y +inf.0]) (+ x y)))
+           (A (2) (1 2)))
+          (A (2 2) (10 20 30 40)))))
+  (apply-reduction-relation*
+   ->Array
+   (term ((λ ([x +inf.0][y +inf.0]) (+ x y))
+          (A (2) (1 2))
+          (A (2 2) (10 20 30 40)))))))
 
