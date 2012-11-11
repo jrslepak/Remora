@@ -116,10 +116,10 @@
         arr/f-lift]
    [--> (in-hole E (fun arr/v ...))
         (in-hole E (array-map fun (arr/v ...)))
-        (where (num_rank ...) (fun-rank fun))
+        (where (natural_rank ...) (fun-rank fun))
         ; arrays must all be overranked and by the same (nonzero) amount
-        (side-condition (term (all ((overrank? num_rank arr/v) ...))))
-        (side-condition (term (same-overrank? [(num_rank arr/v) ...])))
+        (side-condition (term (all ((overrank? natural_rank arr/v) ...))))
+        (side-condition (term (same-overrank? [(natural_rank arr/v) ...])))
         (side-condition (< 0 (length (term (arr/v ...)))))
         ; require that mapping produce an array rather than #f (map error)
         (side-condition (term (array-map fun (arr/v ...))))
