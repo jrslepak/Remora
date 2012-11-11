@@ -550,8 +550,8 @@
 
 ;; metafunction wrapper for existing length function
 (define-metafunction Arrays
-  length/m : num num -> bool
-  [(length/m num_1 num_2) ,(length (term num_1) (term num_2))])
+  length/m : (any ...) -> num
+  [(length/m (any ...)) ,(length (term (any ...)))])
 
 ;; metafunction wrapper for existing > function
 (define-metafunction Arrays
