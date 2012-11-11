@@ -59,9 +59,8 @@
   (reduction-relation
    Arrays
    #:domain expr
-   ; TODO: change reduce to do a divide-and-conquer pattern
    [--> (in-hole E ((reduce fun) arr/pv))
-        (in-hole E (chain-apply/r fun (arr/pv_cell ...)))
+        (in-hole E (tree-apply fun (arr/pv_cell ...)))
         (where (arr/pv_cell ...) (cells/rank -1 arr/pv))
         reduce]
    [--> (in-hole E ((fold/r fun arr/v) arr/pv))
@@ -195,6 +194,18 @@
   [(chain-apply/l fun (arr)) arr]
   [(chain-apply/l fun (arr_0 ... arr_1))
    (fun (chain-apply/l fun (arr_0 ...)) arr_1)])
+;; similar to chain-apply but for tree-shaped application to the arrays
+(define-metafunction Arrays
+  tree-apply : fun (arr ...) -> any
+  [(tree-apply fun (arr)) arr]
+  [(tree-apply fun (arr_0 arr_1)) (fun arr_0 arr_1)]
+  [(tree-apply fun (arr ...))
+   #;((arr_0 ...) || (arr_1 ...))
+   (fun (tree-apply fun (arr_0 ...))
+        (tree-apply fun (arr_1 ...)))
+   (where num_length (length/m (arr ...)))
+   (where (arr_0 ...) (take/m (arr ...) ,(quotient (term num_length) 2)))
+   (where (arr_1 ...) (drop/m (arr ...) ,(quotient (term num_length) 2)))])
 
 ;; get the neutral/identity element of a function
 (define-metafunction Arrays
