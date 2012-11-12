@@ -48,7 +48,7 @@
   ; evaluation contexts
   (E hole
      (E expr ...)
-     (val expr ... E expr ...)
+     (val val ... E expr ...)
      ;(A (E expr ...) (expr ...))
      ;(A (num ... E expr ...) (expr ...))
      (A (num ...) (E expr ...))
@@ -96,9 +96,6 @@
                (fun-rank fun_0))
         ; ensure they are all overranked by the same amount
         (side-condition (term (same-overrank?
-                               ; TODO: this will never match if cells expect
-                               ; negative or infinite rank -- need too add a
-                               ; naturalization step
                                [(0 arr/f) (natural_funrank arr/v) ...])))
         (side-condition (term (all ((overrank? 0 arr/f)
                                     (overrank? natural_funrank arr/v) ...))))
