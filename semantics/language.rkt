@@ -4,27 +4,23 @@
          redex)
 
 (define-language Arrays
-  (expr (expr expr ...)
-        fun
-        arr
-        base
-        var)
+  (t-expr (t-expr t-expr ...)
+          arr
+          var)
+  (expr t-expr elt)
+  
+  ; array elements: base data and functions
+  (elt base fun)
+  
+  ; base data types: numbers and booleans
+  (base num bool)
+  (num number)
+  (bool #t #f)
   
   ; functions may be builtin or user-defined
   (fun (λ [(var num) ...] expr)
        op
        c-op)
-  
-  ; syntax for writing arrays
-  ; also include nested vector representation?
-  (arr (A (num ...) (expr ...))) ; flat representation, shape and values
-  
-  (arr/pv (A (num ...) (elt ...))) ; pseudo-value form -- no app forms inside
-  (elt arr/pv val base)
-  (arr/v arr/b arr/f) ; value form -- only base data or functions inside
-  (arr/b (A (num ...) (base ...)))
-  (arr/f (A (num ...) (fun ...)))
-  
   ; builtin operators
   (op + - * /)
   ; curried builtins
@@ -32,47 +28,39 @@
         fold/l
         fold/r)
   
-  ; TODO: There is a lot of vestigial syntax categorization here. Fixing it
-  ; should make other things simpler (e.g. won't need two collapse rules).
+  ; syntax for writing arrays
+  (arr (A (num ...) (expr ...))) ; flat representation, shape and values
+  (arr/pv (A (num ...) (elt ...))) ; pseudo-value form -- no app forms inside
+  (pseudo-elt arr/pv arr/v base)
+  (arr/v arr/b arr/f) ; value form -- only base data or functions inside
+  (arr/b (A (num ...) (base ...)))
+  (arr/f (A (num ...) (fun ...)))
   
   ; variables
   (var variable-not-otherwise-mentioned)
   
-  ; base data types: numbers and booleans
-  (base num bool)
-  (num number)
-  (bool #t #f)
-  
-  ; value forms
-  (val (λ [(var num) ...] expr)
-       op
-       arr/v)
-  
   ; evaluation contexts
   (E hole
      (E expr ...)
-     (val val ... E expr ...)
-     ;(A (E expr ...) (expr ...))
-     ;(A (num ... E expr ...) (expr ...))
-     (A (num ...) (E expr ...))
-     (A (num ...) (val ... E expr ...))))
+     (arr/v ... E expr ...)
+     (A (num ...) (arr/v ... E expr ...))))
 
 
 (define ->Array
   (reduction-relation
    Arrays
-   #:domain expr
-   [--> (in-hole E ((reduce arr/f) arr/pv))
-        (in-hole E (tree-apply arr/f (arr/pv_cell ...)))
-        (where (arr/pv_cell ...) (cells/rank -1 arr/pv))
+   #:domain t-expr
+   [--> (in-hole E (((A () (reduce)) arr/f) arr/v))
+        (in-hole E (tree-apply arr/f (arr/v_cell ...)))
+        (where (arr/v_cell ...) (cells/rank -1 arr/v))
         reduce]
-   [--> (in-hole E ((fold/r arr/f arr/v) arr/pv))
-        (in-hole E (chain-apply/r arr/f (arr/pv_cell ... arr/v)))
-        (where (arr/pv_cell ...) (cells/rank -1 arr/pv))
+   [--> (in-hole E (((A () (fold/r)) arr/f arr/v_0) arr/v_1))
+        (in-hole E (chain-apply/r arr/f (arr/v_cell ... arr/v_0)))
+        (where (arr/v_cell ...) (cells/rank -1 arr/v_1))
         fold/r]
-   [--> (in-hole E ((fold/l arr/f arr/v) arr/pv))
-        (in-hole E (chain-apply/l arr/f (arr/v arr/pv_cell ...)))
-        (where (arr/pv_cell ...) (cells/rank -1 arr/pv))
+   [--> (in-hole E (((A () (fold/l)) arr/f arr/v_0) arr/v_1))
+        (in-hole E (chain-apply/l arr/f (arr/v_0 arr/v_cell ...)))
+        (where (arr/v_cell ...) (cells/rank -1 arr/v_1))
         fold/l]
    [--> (in-hole E ((A () (op)) arr ...))
         (in-hole E (apply-op op (arr ...)))
@@ -618,7 +606,7 @@
  (check-equal?
   (apply-reduction-relation*
    ->Array
-   (term ((reduce (scalar +))
+   (term (((scalar reduce) (scalar +))
           (A (3 3) (1 2 3
                     4 5 6
                     7 8 9)))))
@@ -627,7 +615,7 @@
  (check-equal?
   (apply-reduction-relation*
    ->Array
-   (term ((sλ ([x 1]) ((reduce (scalar +)) x))
+   (term ((sλ ([x 1]) (((scalar reduce) (scalar +)) x))
           (A (3 3) (1 2 3
                     4 5 6
                     7 8 9)))))
@@ -636,14 +624,14 @@
  (check-equal?
   (apply-reduction-relation*
    ->Array
-   (term ((fold/r (scalar -) (scalar 0))
+   (term (((scalar fold/r) (scalar -) (scalar 0))
           (A (4) (1 1 1 1)))))
   (term ((A () (0)))))
  
  (check-equal?
   (apply-reduction-relation*
    ->Array
-   (term ((fold/l (scalar -) (scalar 0))
+   (term (((scalar fold/l) (scalar -) (scalar 0))
           (A (4) (1 1 1 1)))))
   (term ((A () (-4)))))
  
