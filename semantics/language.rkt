@@ -2,6 +2,7 @@
 
 (require rackunit
          redex)
+(provide Arrays)
 
 (define-language Arrays
   (expr (expr expr ...)
