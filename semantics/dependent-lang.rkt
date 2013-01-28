@@ -398,11 +398,17 @@
   sort-env-lookup : var sort-env -> sort or #f
   [(sort-env-lookup var (s-bind_0 ... [var sort] s-bind_1 ...))
    sort
-   (side-condition (not (term (type-env-lookup var (s-bind_0 ...)))))]
+   (side-condition (not (term (sort-env-lookup var (s-bind_0 ...)))))]
   [(sort-env-lookup var sort-env) #f])
 
 (define-metafunction Dependent
-  type-env-update : t-bind type-env -> type-env
+  type-env-update : t-bind ... type-env -> type-env
+  ; if no changes, return the environment as-is
+  [(type-env-update type-env) type-env]
+  ; if multiple changes, apply each individually
+  [(type-env-update t-bind_0 t-bind_1 t-bind_2 ... type-env)
+   (type-env-update t-bind_1 t-bind_2 ...
+                    (type-env-update t-bind_0 type-env))]
   ; eliminate any already-present occurrences of the variable in the environment
   [(type-env-update [var type_new] (t-bind_0 ... [var type_old] t-bind_1 ...))
    (type-env-update [var type_new] (t-bind_0 ... t-bind_1 ...))]
@@ -551,9 +557,47 @@
                             [y (Array (S 3) Bool)]
                             [y (Array (S 5 2) Bool)])))
   (term (Array (S 3) Bool)))
+ 
  (check-equal?
   (term (type-env-update [y (Array (S) Num)]
                          ([x (Array (S 3) Num)]
                           [y (Array (S 3) Bool)]
                           [y (Array (S 5 2) Bool)])))
-  (term ([y (Array (S) Num)] [x (Array (S 3) Num)]))))
+  (term ([y (Array (S) Num)] [x (Array (S 3) Num)])))
+ (check-equal?
+  (term (type-env-update [y (Array (S) Num)]
+                         [z (Array (S 5) ((Array (S) Num) -> (Array (S) Num)))]
+                         ([x (Array (S 3) Num)]
+                          [y (Array (S 3) Bool)]
+                          [y (Array (S 5 2) Bool)])))
+  (term ([z (Array (S 5) ((Array (S) Num) -> (Array (S) Num)))]
+         [y (Array (S) Num)]
+         [x (Array (S 3) Num)])))
+ 
+ ; sort environment manipulation
+ (check-equal?
+  (term (sort-env-lookup k ([k Shape]
+                            [l Nat])))
+  (term Shape))
+ (check-equal?
+  (term (sort-env-lookup k ([l Shape]
+                            [k Nat])))
+  (term Nat))
+ (check-equal?
+  (term (sort-env-lookup k ([k Shape]
+                            [k Nat])))
+  (term Shape))
+ 
+ (check-equal?
+  (term (sort-env-update [y Shape]
+                         ([x Nat]
+                          [y Nat]
+                          [y Shape])))
+  (term ([y Shape] [x Nat])))
+ (check-equal?
+  (term (sort-env-update [y Shape]
+                         [z Nat]
+                         ([x Nat]
+                          [y Nat]
+                          [y Shape])))
+  (term ([z Nat] [y Shape] [x Nat]))))
