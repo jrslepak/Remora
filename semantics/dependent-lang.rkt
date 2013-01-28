@@ -6,9 +6,11 @@
          "typed-lang.rkt")
 
 (define-extended-language Dependent Arrays
-  ; need to put dependent λ somewhere
+  ; need to put dependent λ and syntax for ∑-related things somewhere
+  ; may also want to add a type annotation to array syntax
+  ; (A type (num ...) (el-expr ...)), etc.
   (expr ....
-        (expr idx ...))
+        (INDEX expr idx ...))
   
   ; for array syntax, already-present shape vector works as constructor index
   ; allow arrays of types and sorts? or are arrays strictly value-level?
@@ -27,24 +29,32 @@
         ; in DML's style of typing, functions are not dependent products
         (type ... -> type)
         (× type ...) ; product types may be needed later
-        (Array idx elt-type)
-        var)
-  (elt-type btype type)
-  ; base types
-  (btype Num Bool)
+        (Array idx type)
+        var
+        base-type)
+  (base-type Num Bool)
   
   ; sort-level pieces
   ; constraint domain would probably be something like nat lists
   (sort Nat
-         Shape)
+        Shape)
   (idx natural
        (S idx ...)
        ; sort-level computation to determine output shape
        ; handled via metafunction once actual indices known
+       ; we require [shape naturalized-rank] pairs
+       ; TODO: probably going to need more operations on shapes eventually
        (frame [idx idx] ...)
        var)
   
-  ; extra machinery for type checking
+  ; this feels hackish, but the type/index substitution seems to need it
+  (type/idx type idx)
+  
+  ; extra machinery for type checking and substitution purposes
+  (expr-env (e-bind ...))
+  (e-bind [var expr])
+  (idx-env (i-bind ...))
+  (i-bind [var idx])
   (type-env (t-bind ...))
   (t-bind [var type])
   (sort-env (s-bind ...))
