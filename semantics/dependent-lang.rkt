@@ -66,12 +66,12 @@
   #:contract (type-of sort-env type-env expr type)
   #:mode (type-of I I I O)
   ; array: find element type, check for correct number of elements
-  [(type-of/elts sort-env type-env (el-expr ...) elt-type)
+  [(type-of/elts sort-env type-env (el-expr ...) type)
    (side-condition (size-check (A (natural ...) (el-expr ...))))
    --- array
    (type-of sort-env type-env
             (A (natural ...) (el-expr ...))
-            (Array (S natural ...) elt-type))]
+            (Array (S natural ...) type))]
   ; variable: grab from environment (not there -> ill-typed)
   [; should probably change this to have premise which calls type env lookup
    --- variable
