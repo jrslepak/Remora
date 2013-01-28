@@ -2,12 +2,14 @@
 
 (require rackunit
          redex)
-(provide Arrays)
+(provide Arrays
+         take/m drop/m take-right/m drop-right/m prefix?)
 
 (define-language Arrays
   (expr (expr expr ...)
           arr
-          var)
+          var
+          fun)
   (el-expr expr elt)
   
   ; array elements: base data and functions
