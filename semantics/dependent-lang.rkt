@@ -10,6 +10,13 @@
   ; may also want to add a type annotation to array syntax
   ; (A type (num ...) (el-expr ...)), etc.
   (expr ....
+        ; type abstraction
+        (Λ [var ...] expr)
+        ; type application
+        (TYPE expr type ...)
+        ; index abstraction
+        #; ???
+        ; index application
         (INDEX expr idx ...))
   
   ; for array syntax, already-present shape vector works as constructor index
@@ -30,6 +37,7 @@
         (type ... -> type)
         (× type ...) ; product types may be needed later
         (Array idx type)
+        (∀ [var ...] type) ; no type-level computation -> there is only one kind
         var
         base-type)
   (base-type Num Bool)
@@ -44,6 +52,7 @@
        ; handled via metafunction once actual indices known
        ; we require [shape naturalized-rank] pairs
        ; TODO: probably going to need more operations on shapes eventually
+       ; addition, multiplication
        (frame [idx idx] ...)
        var)
   
@@ -62,6 +71,9 @@
 
 ; type check an expression (or single element expression) in the
 ; dependently-typed version of the language
+; TODO: adding quantified types means this becomes a 5-place relation
+; need a kind-env ::= (var ...), and have to check that type variables are bound
+; before they are used (they can appear in λ, Λ, and TYPE forms)
 (define-judgment-form Dependent
   #:contract (type-of sort-env type-env expr type)
   #:mode (type-of I I I O)
@@ -134,8 +146,19 @@
    (type-of sort-env type-env
             (expr_fun expr_arg ...)
             type_output)]
-  ; index abstraction: 
+  
+  ; type abstraction: 
+  [; here is where we need the kind-env (extend here, check in other rules)
+   ---
+   (type-of sort-env type-env (Λ [var ...] expr_body) (∀ [var ...] type))]
+  
+  ; type application
+  
+  ; index abstraction: extend sort environment, make sure body has correct type
+  ; (still need to decide on syntax for this, or just exclude it)
+  
   ; index app: check that indices have proper sort, substitute indices into type
+  ; TODO: expr should be an array, not just a dependent product
   [(type-of sort-env type-env expr (∏ ([var sort] ...) type))
    (sort-of sort-env type-env idx sort) ...
    --- idx-app
@@ -192,6 +215,7 @@
 ; judgment forms for checking type equivalence
 ; instead of a general term equivalence, the restricted dependent typing allows
 ; a much simpler "index equivalence" judgment
+; TODO: does canonicalization metafunction make this superfluous?
 (define-judgment-form Dependent
   #:contract (equiv-type sort-env type-env type type)
   #:mode (equiv-type I I I I)
@@ -230,6 +254,7 @@
                (Array (S idx_0 ...) (Array (S idx_1 ...) type)))]
   )
 
+; this can probably be replaced by use of canonicalize-index
 (define-judgment-form Dependent
   #:contract (equiv-idx sort-env type-env idx idx)
   #:mode (equiv-idx I I I I)
