@@ -34,6 +34,7 @@
       nub-sieve
       head behead tail curtail)
   ; curried builtins
+  ; TODO: maybe curried builtins are bad idea: provide λ-wrapped primop instead
   (c-op reduce
         fold/l
         fold/r)

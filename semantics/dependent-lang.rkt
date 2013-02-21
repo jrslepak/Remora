@@ -6,16 +6,20 @@
          "typed-lang.rkt")
 
 (define-extended-language Dependent Arrays
-  ; need to put dependent λ and syntax for ∑-related things somewhere
+  ; need to put dependent λ and syntax for Σ-related things somewhere
   ; may also want to add a type annotation to array syntax
   ; (A type (num ...) (el-expr ...)), etc.
   (expr ....
-        ; type abstraction
+        ; type abstraction (or should this be at `fun' level?)
         (Λ [var ...] expr)
         ; type application
         (TYPE expr type ...)
+        ; construction of dependent sum
+        (SUM idx ... expr type)
+        ; can only get the abstracted thing -- the witness is an index
+        (Σ-PROJ expr)
         ; index abstraction
-        #; ???
+        (ל [(var sort) ...] expr)
         ; index application
         (INDEX expr idx ...))
   
@@ -23,16 +27,14 @@
   ; allow arrays of types and sorts? or are arrays strictly value-level?
   
   ; have to include type annotations in λ syntax
+  ; TODO: with parametric polymorphism, is rank annotation still needed?
   (fun (λ [(var num type) ...] expr)
        op
        c-op)
   
-  (E ....
-     (E idx ...))
-  
   ; type-level pieces
-  (type (∏ [(var sort) ...] type)
-        (∑ [(var sort) ...] type)
+  (type (Π [(var sort) ...] type)
+        (Σ [(var sort) ...] type)
         ; in DML's style of typing, functions are not dependent products
         (type ... -> type)
         (× type ...) ; product types may be needed later
@@ -54,58 +56,62 @@
        ; TODO: probably going to need more operations on shapes eventually
        ; addition, multiplication
        (frame [idx idx] ...)
+       ; extract the `var' witness from dependent sum
+       (Σ-WITNESS var expr)
        var)
   
   ; this feels hackish, but the type/index substitution seems to need it
   (type/idx type idx)
   
   ; extra machinery for type checking and substitution purposes
-  (expr-env (e-bind ...))
-  (e-bind [var expr])
-  (idx-env (i-bind ...))
-  (i-bind [var idx])
-  (type-env (t-bind ...))
-  (t-bind [var type])
-  (sort-env (s-bind ...))
-  (s-bind [var sort]))
+  (expr-env (e-bind ...)) (e-bind [var expr])
+  (idx-env (i-bind ...)) (i-bind [var idx])
+  (type-env (t-bind ...)) (t-bind [var type])
+  (kind-env (k-bind ...)) (k-bind [var ★]) ; may later need [var kind]
+  (sort-env (s-bind ...)) (s-bind [var sort]))
+
 
 ; type check an expression (or single element expression) in the
 ; dependently-typed version of the language
-; TODO: adding quantified types means this becomes a 5-place relation
 ; need a kind-env ::= (var ...), and have to check that type variables are bound
-; before they are used (they can appear in λ, Λ, and TYPE forms)
+; before they are used (they can appear in λ, Λ, ל, and TYPE forms)
 (define-judgment-form Dependent
-  #:contract (type-of sort-env type-env expr type)
-  #:mode (type-of I I I O)
+  #:contract (type-of sort-env kind-env type-env expr type)
+  #:mode (type-of I I I I O)
   ; array: find element type, check for correct number of elements
-  [(type-of/elts sort-env type-env (el-expr ...) type)
+  [(side-condition (display "checking array"))
+   (type-of/elts sort-env kind-env type-env (el-expr ...) type)
    (side-condition (size-check (A (natural ...) (el-expr ...))))
    --- array
-   (type-of sort-env type-env
+   (type-of sort-env kind-env type-env
             (A (natural ...) (el-expr ...))
             (Array (S natural ...) type))]
   ; variable: grab from environment (not there -> ill-typed)
   [; should probably change this to have premise which calls type env lookup
+   (side-condition (display "checking variable"))
    --- variable
-   (type-of sort-env ([var_0 type_0] ... [var_1 type_1] [var_2 type_2] ...)
-            var_1 type_1)]
-  ; primitive operator: call out to metafunction?
-  [(where type (primop-type op))
+       (type-of sort-env kind-env
+                ([var_0 type_0] ... [var_1 type_1] [var_2 type_2] ...)
+                var_1 type_1)]
+  ; primitive operator: call out to metafunction
+  [(side-condition (display "checking primop"))
+   (where type (primop-type op))
    --- operator
-   (type-of sort-env type-env op type)]
+   (type-of sort-env kind-env type-env op type)]
   ; λ abstraction: add inputs to type environment, check body
-  [(type-of sort-env (type-env-update [var type_arg] ... type-env)
+  [(side-condition (display "checking λ abstraction"))
+   (kind-of sort-env kind-env type-env type_arg) ...
+   (type-of sort-env kind-env (type-env-update [var type_arg] ... type-env)
             expr type_body)
    --- lambda
-   (type-of sort-env type-env
+   (type-of sort-env kind-env type-env
             (λ [(var num type_arg) ...] expr)
             (type_arg ... -> type_body))]
   ; function app: check that args are equivalent to what function expects
   [; first, identify function's and args' types (need a handle on their shapes)
-   ; TODO: what about nested array of functions?
-   (type-of sort-env type-env expr_fun type_fun)
-   (type-of sort-env type-env expr_arg type_arg)
-   ...
+   (side-condition (display "checking function application"))
+   (type-of sort-env kind-env type-env expr_fun type_fun)
+   (type-of sort-env kind-env type-env expr_arg type_arg) ...
    ; get canonical types for the function & argument arrays
    (where (Array idx_fun-shape (type_input0 ... -> type_output))
           (canonicalize-type type_fun))
@@ -114,154 +120,166 @@
    ; extract expected rank of function array's elements
    (where (natural_arg-rank ...)
           (type->arg-rank (type_input0 ... -> type_output)))
+   (side-condition (display (term expr_fun)))
    ; determine the frame of the implicit `apply'
    ; it's the approrpriate-sized prefix of the shape with the highest overrank
    (where (natural_app-rank ...) (0 natural_arg-rank ...))
    (where (natural_term-rank ...)
           ((shape->rank idx_fun-shape) (shape->rank idx_arg-shape) ...))
-   (where (S natural_app-frame ...)
+   ; originally had natural_app-frame, but axes might be variables too
+   (where (S idx_app-frame ...)
           (frame-shape (natural_app-rank ...)
                        (idx_fun-shape idx_arg-shape ...)))
+   ; if they are, they'd better be have sort Nat
+   (sort-of sort-env kind-env type-env idx_app-frame Nat) ...
    ; make sure all terms can lift into this frame, i.e. each term's individual
    ; frame shape is a prefix of apply's frame shape
    ; this requires dropping the cell parts of all terms' shapes
    (side-condition
-    (prefix-agree? (S natural_app-frame ...)
+    (prefix-agree? (S idx_app-frame ...)
                    ; non-cell parts of terms' shapes
                    ((exclude-cell 0 idx_fun-shape)
                     (exclude-cell natural_arg-rank idx_arg-shape) ...)))
    --- fun-app
-   (type-of sort-env type-env
+   (type-of sort-env kind-env type-env
             (expr_fun expr_arg ...)
-            (Array (S natural_app-frame ...) type_output)
-            #;(× (Array (S natural_app-frame ...) type_output)
-               
-               (Array (S natural_app-rank ...) Bool)
-               (Array idx_fun-shape Bool)
-               (Array idx_arg-shape (Array (S natural_arg-rank) Bool)) ...))]
-  #;[(type-of sort-env type-env expr_fun (type_input0 ... -> type_output))
-   (type-of sort-env type-env expr_arg type_input1) ...
-   (equiv-type sort-env type-env type_input0 type_input1) ...
-   --- fun-app
-   (type-of sort-env type-env
-            (expr_fun expr_arg ...)
-            type_output)]
+            (canonicalize-type (Array (S idx_app-frame ...) type_output)))]
   
   ; type abstraction: 
   [; here is where we need the kind-env (extend here, check in other rules)
+   (side-condition (display "checking type abstraction"))
+   (type-of sort-env (kind-env-update [var ★] ... kind-env) type-env
+            expr_body type)
    ---
-   (type-of sort-env type-env (Λ [var ...] expr_body) (∀ [var ...] type))]
+   (type-of sort-env kind-env type-env
+            (Λ [var ...] expr_body) (∀ [var ...] type))]
   
   ; type application
+  [(side-condition (display "checking type application"))
+   (type-of sort-env kind-env type-env expr
+            (Array idx (∀ (var ...) type)))
+   (kind-of sort-env kind-env type-env type_arg) ...
+   ---
+   (type-of sort-env kind-env type-env
+            (TYPE expr type_arg ...)
+            (Array idx (type-sub [(var type_arg) ...] type)))]
   
   ; index abstraction: extend sort environment, make sure body has correct type
-  ; (still need to decide on syntax for this, or just exclude it)
+  [(side-condition (display "checking index abstraction"))
+   (type-of (sort-env-update [var sort] ... sort-env)
+            kind-env type-env expr type)
+   ---
+   (type-of sort-env kind-env type-env
+            (ל [(var sort) ...] expr)
+            (Π [(var sort) ...] type))]
   
   ; index app: check that indices have proper sort, substitute indices into type
-  ; TODO: expr should be an array, not just a dependent product
-  [(type-of sort-env type-env expr (∏ ([var sort] ...) type))
-   (sort-of sort-env type-env idx sort) ...
+  [(side-condition (display "checking index application"))
+   (type-of sort-env kind-env type-env expr
+            (Array idx_prod (Π ([var sort] ...) type)))
+   (sort-of sort-env kind-env type-env idx_prod Shape)
+   (sort-of sort-env kind-env type-env idx_arg sort) ...
    --- idx-app
-   (type-of sort-env type-env (INDEX expr idx ...)
-            (index-sub ([var idx] ...) type))]
+   (type-of sort-env kind-env type-env (INDEX expr idx_arg ...)
+            (Array idx_prod (index-sub ([var idx_arg] ...) type)))]
+  
+  ; projection from dependent sum
+  [(type-of sort-env kind-env type-env expr (Σ [(var sort) ...] type))
+   ---
+   (type-of sort-env kind-env type-env (Σ-PROJ expr)
+            (index-sub [(var (Σ-WITNESS var expr))...] type))]
+  
+  ; creation of dependent sum
+  [(sort-of sort-env kind-env type-env idx sort) ...
+   ; type_subbed in the type-of premise is in a position where metafunctions
+   ; don't get evaluated, so we have to evaluate it in a `where' clause
+   (where type_subbed (index-sub [(var idx) ...] type))
+   (type-of sort-env kind-env type-env expr type_subbed)
+   ;(where type_0 (canonicalize-type type))
+   ---
+   (type-of sort-env kind-env type-env
+            (SUM idx ... expr (Σ [(var sort) ...] type))
+            (Σ [(var sort) ...] type))]
   )
 
 (define-judgment-form Dependent
-  #:contract (sort-of sort-env type-env idx sort)
-  #:mode (sort-of I I I O)
+  #:contract (sort-of sort-env kind-env type-env idx sort)
+  #:mode (sort-of I I I I O)
   [#;???
    --- sort-nat
-   (sort-of sort-env type-env natural Nat)]
-  [(sort-of sort-env type-env idx Nat) ...
+   (sort-of sort-env kind-env type-env natural Nat)]
+  [(sort-of sort-env kind-env type-env idx Nat) ...
    --- sort-shape
-   (sort-of sort-env type-env (S idx ...) Shape)]
-  [(sort-of sort-env type-env idx_shape Shape) ...
-   (sort-of sort-env type-env idx_rank Nat) ...
+   (sort-of sort-env kind-env type-env (S idx ...) Shape)]
+  [---
+   (sort-of ([var_0 sort_0] ... [var sort] [var_1 sort_1] ...)
+            kind-env type-env var sort)]
+  [(sort-of sort-env kind-env type-env idx_shape Shape) ...
+   (sort-of sort-env kind-env type-env idx_rank Nat) ...
    ; TODO: will need a separate metafunction for this
    ; may also need to track actual index values
    ; or is that left to constraint generation?
    #;(side-condition (valid-shape (frame [idx_shape idx_rank] ...)))
    --- sort-frame
-   (sort-of sort-env type-env (frame [idx_shape idx_rank] ...) Shape)]
+   (sort-of sort-env kind-env type-env (frame [idx_shape idx_rank] ...) Shape)]
+  [(type-of sort-env kind-env type-env expr
+            (Σ [(var_0 sort_0) ... (var sort) (var_1 sort_1) ...] type))
+   ---
+   (sort-of sort-env kind-env type-env (Σ-WITNESS var expr) sort)]
   )
+
+; Determine whether a type is well-formed (does not use free variables for
+; types or indices).
+(define-judgment-form Dependent
+  #:contract (kind-of sort-env kind-env type-env type)
+  #:mode (kind-of I I I I)
+  [---
+   (kind-of sort-env kind-env type-env base-type)]
+  [---
+   (kind-of sort-env ([var_0 ★] ... [var ★] [var_1 ★] ...) type-env var)]
+  [(kind-of (sort-env-update [var sort] ... sort-env) kind-env type-env type)
+   ---
+   (kind-of sort-env kind-env type-env (Π [(var sort) ...] type))]
+  [(kind-of (sort-env-update [var sort] ... sort-env) kind-env type-env type)
+   ---
+   (kind-of sort-env kind-env type-env (Σ [(var sort) ...] type))]
+  [(kind-of sort-env kind-env type-env type_arg) ...
+   (kind-of sort-env kind-env type-env type_result)
+   ---
+   (kind-of sort-env kind-env type-env (type_arg ... -> type_result))]
+  [(kind-of sort-env kind-env type-env type) ...
+   ---
+   (kind-of sort-env kind-env type-env (× type ...))]
+  [(kind-of sort-env kind-env type-env type)
+   (sort-of sort-env kind-env type-env idx Shape)
+   ---
+   (kind-of sort-env kind-env type-env (Array idx type))]
+  [(kind-of sort-env (kind-env-update [var ★] ... kind-env) type-env type)
+   ---
+   (kind-of sort-env kind-env type-env (∀ [var ...] type))])
+
+
 
 ; separate judgment needed for checking array element types
 ; they must all have equivalent types (this will require that equivalent
 ; types be reducible to some canonical form)
 (define-judgment-form Dependent
-  #:contract (type-of/elts sort-env type-env (el-expr ...) type)
-  #:mode (type-of/elts I I I O)
-  ; empty arrays will need either annotation or special casing
-  [(type-of sort-env type-env expr_0 type_0)
-   (type-of sort-env type-env expr_1 type_1) ...
-   ; TODO: metafunction or judgment form?
-   ; judgment form will probably need auxiliary metafunctions anyway
-   ; - evaluate (frame _) forms
-   ; - collapse nested arrays
-   (side-condition (equivalent-types type_0 type_1 ...))
-   --- ???
-   (type-of/elts sort-env type-env (expr_0 expr_1 ...) type_0)]
-  ; simple cases are base types
-  ; does it ever make sense to have vars of type Num or Bool?
-  ; maybe not, but it might make sense to have vars in an array, so have to
-  ; handle arbitrary types on the inside anyway
+  #:contract (type-of/elts sort-env kind-env type-env (el-expr ...) type)
+  #:mode (type-of/elts I I I I O)
+  ; TODO: empty arrays will need either annotation or special casing
+  ; as it stands now, they check as empty arrays of base type
+  [(type-of sort-env kind-env type-env expr_0 type_0)
+   (type-of sort-env kind-env type-env expr_1 type_1) ...
+   (side-condition (term (all-equal? [(canonicalize-type type_0)
+                                      (canonicalize-type type_1) ...])))
+   --- non-base-elt
+   (type-of/elts sort-env kind-env type-env (expr_0 expr_1 ...) type_0)]
+  ; simple cases are base types (this is the only place where raw base-typed
+  ; values can appear)
   [--- num-elt
-       (type-of/elts sort-env type-env (num ...) Num)]
+       (type-of/elts sort-env kind-env type-env (num ...) Num)]
   [--- bool-elt
-       (type-of/elts sort-env type-env (bool ...) Bool)]
-  ; odd case is array-of-arrays, then look at elements as exprs
-  )
-
-; judgment forms for checking type equivalence
-; instead of a general term equivalence, the restricted dependent typing allows
-; a much simpler "index equivalence" judgment
-; TODO: does canonicalization metafunction make this superfluous?
-(define-judgment-form Dependent
-  #:contract (equiv-type sort-env type-env type type)
-  #:mode (equiv-type I I I I)
-  [#;(well-formed sort-env type-env type)
-   ; is a well-formedness check needed?
-   --- teq-refl
-   (equiv-type sort-env type-env type type)]
-  ; basics of congruence
-  [(equiv-type sort-env type-env type_0 type_1)
-   (equiv-idx sort-env type-env idx_0 idx_1)
-   --- teq-array
-   (equiv-type sort-env type-env
-               (Array idx_0 type_0)
-               (Array idx_1 type_1))]
-  [(equiv-type sort-env type-env type_arg0 type_arg1) ...
-   (equiv-type sort-env type-env type_res0 type_res1)
-   --- teq-fun
-   (equiv-type sort-env type-env
-               (type_arg0 ... -> type_res0)
-               (type_arg1 ... -> type_res1))]
-  [(equiv-type sort-env type-env type_0 type_1) ...
-   --- teq-tuple
-   (equiv-type sort-env type-env
-               (× type_0 ...)
-               (× type_1 ...))]
-  
-  ; canonicalization rules
-  ; collapse nested arrays
-  [--- equiv-nest1
-   (equiv-type sort-env type-env
-               (Array (S idx_0 ...) (Array (S idx_1 ...) type))
-               (Array (S idx_0 ... idx_1 ...) type))]
-  [--- equiv-nest2
-   (equiv-type sort-env type-env
-               (Array (S idx_0 ... idx_1 ...) type)
-               (Array (S idx_0 ...) (Array (S idx_1 ...) type)))]
-  )
-
-; this can probably be replaced by use of canonicalize-index
-(define-judgment-form Dependent
-  #:contract (equiv-idx sort-env type-env idx idx)
-  #:mode (equiv-idx I I I I)
-  [--- ieq-refl
-   (equiv-idx sort-env type-env idx idx)]
-  ; TODO: frame
-  )
+       (type-of/elts sort-env kind-env type-env (bool ...) Bool)])
 
 
 ; check whether an array has as many elements as its shape says it should have
@@ -276,15 +294,20 @@
 (define-metafunction Dependent
   frame-shape : (natural ...) (idx ...) -> idx
   [(frame-shape (natural_rank ...) (idx ...))
-   (S natural_frame-dim ...)
+   (S idx_frame-dim ...)
    ; how overranked is each term?
    (where (natural_over ...)
           ((-/m (shape->rank idx) natural_rank) ...))
+   ;(side-condition (displayln (term (natural_over ...))))
    ; position of highest overrank?
-   (where (natural_overrank (S natural_dim ...))
+   ;(side-condition (displayln (argmax first (term ([natural_over idx] ...)))))
+   (where (natural_overrank (S idx_dim ...))
           ,(argmax first (term ([natural_over idx] ...))))
+   ;(side-condition (displayln (term (natural_overrank (S idx_dim ...)))))
    ; extract prefix
-   (where (natural_frame-dim ...) (take/m (natural_dim ...) natural_overrank))
+   (where (idx_frame-dim ...) (take/m (idx_dim ...) natural_overrank))
+   
+   ;(side-condition (displayln ""))
    ; check that extracted prefix is a prefix of the other shapes
    ;(side-condition (term (prefix-agree? 
    ])
@@ -293,51 +316,55 @@
 (define-metafunction Dependent
   prefix-agree? : idx (idx ...) -> bool
   [(prefix-agree? idx ()) #t]
-  [(prefix-agree? (S natural_prefix ...) ((S natural_shape ...) idx ...))
-   (prefix-agree? (S natural_prefix ...) (idx ...))
-   (side-condition (term (prefix? (natural_shape ...) (natural_prefix ...))))]
+  [(prefix-agree? (S idx_prefix ...) ((S idx_shape ...) idx ...))
+   (prefix-agree? (S idx_prefix ...) (idx ...))
+   (side-condition (term (prefix? (idx_shape ...) (idx_prefix ...))))]
   ; if side-condition not met, we have a mismatch
-  [(prefix-agree? (S natural_prefix ...) ((S natural_shape ...) idx ...)) #f])
+  [(prefix-agree? (S idx_prefix ...) ((S idx_shape ...) idx ...)) #f])
 
 ; find the arg rank associated with a function type
 (define-metafunction Dependent
   type->arg-rank : type -> (natural ...)
   [(type->arg-rank (type_arg ... -> type_result)) ((type->rank type_arg) ...)])
 ; find the rank associated with an array type
-; TODO: is var lookup capability needed here?
+; not for use with an open type
 (define-metafunction Dependent
   type->rank : type -> natural
   ; collapse nested array types
   #;[(type->rank (Array (S idx_outer ...) (Array (S idx_inner ...) type)))
-   ,(+ (length (term (idx_outer ...)))
-       (length (term (idx_inner ...)))
-       (term (type->rank type)))]
+     ,(+ (length (term (idx_outer ...)))
+         (length (term (idx_inner ...)))
+         (term (type->rank type)))]
   [(type->rank (Array (S idx ...) type))
    ,(+ (length (term (idx ...))) (term (type->rank type)))]
   ; for now, pretending all other possible element types are scalar
-  ; more detailed handling of ∑ types might be awkward/impossible
+  ; more detailed handling of Σ types might be awkward/impossible
   [(type->rank type) 0])
 
 ; find the rank associated with a given shape
 ; TODO: add clauses for index-level computation forms
 (define-metafunction Dependent
   shape->rank : idx -> natural
-  [(shape->rank (S natural ...)) ,(length (term (natural ...)))])
+  [(shape->rank (S idx ...)) ,(length (term (idx ...)))])
 
 ; drop the part of a shape designated as the cell
 (define-metafunction Dependent
   exclude-cell : natural idx -> idx
-  [(exclude-cell natural_rank (S natural_dim ...))
-   (S natural_frame-dim ...)
-   (where (natural_frame-dim ...)
-          (drop-right/m (natural_dim ...) natural_rank))])
+  [(exclude-cell natural_rank (S idx_dim ...))
+   (S idx_frame-dim ...)
+   (where (idx_frame-dim ...)
+          (drop-right/m (idx_dim ...) natural_rank))])
 
 (define-metafunction Dependent
   primop-type : fun -> type
-  [(primop-type +) (∏ [(s1 Shape) (s2 Shape)]
-                      ((Array s1 Num)
-                       (Array s2 Num)
-                       -> (Array (frame [s1 0] [s2 0]) Num)))])
+  [(primop-type +) ((Array (S) Num)
+                    (Array (S) Num)
+                    -> (Array (S) Num))]
+  #;[(primop-type +) (Π [(s1 Shape) (s2 Shape)]
+                        ((Array s1 Num)
+                         (Array s2 Num)
+                         -> (Array (frame [s1 0] [s2 0]) Num)))])
+
 
 
 ; substitute indices into a type
@@ -346,6 +373,7 @@
   [(index-sub ([var_0 idx_0] ... [var_1 idx_1] [var_2 idx_2] ...) var_1)
    idx_1
    (side-condition (not (member (term var_1) (term (var_0 ...)))))]
+  [(index-sub ([var idx] ...) var_free) var_free]
   ; substituting in types
   [(index-sub idx-env base-type) base-type]
   [(index-sub idx-env (Array idx type))
@@ -354,15 +382,40 @@
    ((index-sub idx-env type_arg) ... -> (index-sub idx-env type_result))]
   [(index-sub idx-env (× type ...))
    (× (index-sub idx-env type) ...)]
-  ; TODO: shadowing for ∏ and ∑ types
-  [(index-sub idx-env (∏ [(var sort) ...] type))
-   (∏ [(var sort) ...] (index-sub idx-env_shadowed type))
+  [(index-sub idx-env (Π [(var sort) ...] type))
+   (Π [(var sort) ...] (index-sub idx-env_shadowed type))
+   (where idx-env_shadowed (shadow (var ...) idx-env))]
+  [(index-sub idx-env (Σ [(var sort) ...] type))
+   (Σ [(var sort) ...] (index-sub idx-env_shadowed type))
    (where idx-env_shadowed (shadow (var ...) idx-env))]
   ; substituting in indices
   [(index-sub idx-env natural) natural]
   [(index-sub idx-env (S idx ...)) (S (index-sub idx-env idx) ...)]
   [(index-sub idx-env (frame [idx_shape idx_rank] ...))
    (frame [(index-sub idx-env idx_shape) (index-sub idx-env idx_rank)] ...)])
+
+; substitute types into a type
+(define-metafunction Dependent
+  type-sub : ([var type] ...) type -> type
+  [(type-sub ([var_0 type_0] ... [var type] [var_1 type_1] ...) var)
+   type
+   (side-condition (not (member (term var) (term (var_0 ...)))))]
+  [(type-sub ([var type] ...) var_free) var_free]
+  [(type-sub ([var_s type_s] ...) (Π ([var_i sort] ...) type_p))
+   (Π ([var_i sort] ...) (type-sub ([var_s type_s] ...) type_p))]
+  [(type-sub ([var_s type_s] ...) (Σ ([var_i sort] ...) type_p))
+   (Σ ([var_i sort] ...) (type-sub ([var_s type_s] ...) type_p))]
+  [(type-sub ([var type_s] ...) (× type_p ...))
+   (× (type-sub ([var type_s] ...) type_p) ...)]
+  [(type-sub ([var type_s] ...) (type_a ... -> type_r))
+   ((type-sub ([var type_s] ...) type_a) ...
+    -> (type-sub ([var type_s] ...) type_r))]
+  [(type-sub ([var type_s] ...) (Array idx type_e))
+   (Array idx (type-sub ([var type_s] ...) type_e))]
+  [(type-sub ([var_s type_s] ...) (∀ (var_b ...) type_q))
+   (∀ (var_b ...) (type-sub (shadow (var_b ...) ([var_s type_s] ...)) type_q))]
+  [(type-sub ([var type_s] ...) base-type) base-type])
+  
 
 
 ; reduce a type to canonical form:
@@ -372,9 +425,11 @@
   canonicalize-type : type -> type
   ; some types are already in canonical form
   [(canonicalize-type base-type) base-type]
-  ; no reducing inside the body (TODO: actually, it's probably safe to do so)
-  [(canonicalize-type (∏ [(var sort) ...] type)) (∏ [(var sort) ...] type)]
-  [(canonicalize-type (∑ [(var sort) ...] type)) (∑ [(var sort) ...] type)]
+  ; no reducing inside the body (actually, it's probably safe to do so)
+  [(canonicalize-type (Π [(var sort) ...] type)) (Π [(var sort) ...] type)]
+  [(canonicalize-type (Σ [(var sort) ...] type)) (Σ [(var sort) ...] type)]
+  [(canonicalize-type (∀ [var ...] type)) (∀ [var ...] type)]
+  #;[(canonicalize-type (∃ [var ...] type)) (∃ [var ...] type)]
   ; simple structural recursion for most other cases
   [(canonicalize-type (× type ...)) (× (canonicalize-type type) ...)]
   [(canonicalize-type (type_arg ... -> type_result))
@@ -395,9 +450,11 @@
 ; reduce an index to canonical form
 (define-metafunction Dependent
   canonicalize-index : idx -> idx
-  ; naturals and shape literals are already in canonical form
+  ; naturals and variables are already in canonical form
   [(canonicalize-index natural) natural]
-  [(canonicalize-index (S natural ...)) (S natural ...)]
+  [(canonicalize-index var) var]
+  ; for shapes, recur on their axes
+  [(canonicalize-index (S idx ...)) (S (canonicalize-index idx) ...)]
   ; index-level computation
   [(canonicalize-index (frame [idx_rank idx_shape] ...))
    (frame-shape [(canonicalize-index idx_rank) ...]
@@ -406,11 +463,11 @@
 (define-metafunction Dependent
   nest-shape : idx idx ... -> idx
   [(nest-shape idx) idx]
-  [(nest-shape (S natural_frame ...) (S natural_cell ...) idx ...)
-   (nest-shape (S natural_frame ... natural_cell ...) idx ...)])
-   
-  
-  
+  [(nest-shape (S idx_frame ...) (S idx_cell ...) idx ...)
+   (nest-shape (S idx_frame ... idx_cell ...) idx ...)])
+
+
+
 ; type/sort manipulation metafunctions
 (define-metafunction Dependent
   type-env-lookup : var type-env -> type or #f
@@ -456,16 +513,37 @@
   [(sort-env-update [var_new sort_new] ([var_old sort_old] ...))
    ([var_new sort_new] [var_old sort_old] ...)])
 
+; For now, all we can check in a kind environment is whether a certain type
+; variable is there. If type-level computation is to be added later, this will
+; have to become a lookup function like in other environments.
+(define-metafunction Dependent
+  kind-env-contains? : var kind-env -> bool
+  [(kind-env-contains? var ([var_0] ... [var] [var_1] ...)) #t]
+  [(kind-env-contains? var kind-env) #f])
+(define-metafunction Dependent
+  kind-env-update : k-bind ... kind-env -> kind-env
+  ; if no changes, return unmodified environment
+  [(kind-env-update kind-env) kind-env]
+  ; without any actual kinds to bind them to, just look for preexisting bindings
+  [(kind-env-update k-bind_0 k-bind_1 ... (k-bind_2 ... k-bind_0 k-bind_3 ...))
+   (kind-env-update k-bind_1 ... (k-bind_2 ... k-bind_0 k-bind_3 ...))]
+  [(kind-env-update k-bind_0 k-bind_1 ... (k-bind_2 ...))
+   (kind-env-update k-bind_1 ... (k-bind_0 k-bind_2 ...))
+   #;(side-condition (not (term (kind-env-contains? k-bind_0
+                                                    (k-bind_2 ...)))))])
+
 ; remove the named entries from an environment
 ; var bound to any so this can be used on any form of binding list
 (define-metafunction Dependent
   shadow : (var ...) [(var any) ...] -> [(var any) ...]
   [(shadow () [(var any) ...]) [(var any) ...]]
-  [(shadow (var ...) []) []]
+  ;[(shadow (var ...) []) []]
   [(shadow (var_0 var_1 ...)
-                       [(var_2 sort_2) ... (var_0 sort_0) (var_3 sort_3) ...])
+           [(var_2 any_2) ... (var_0 any_0) (var_3 any_3) ...])
    (shadow (var_1 ...)
-                       [(var_2 sort_2) ... (var_3 sort_3) ...])])
+           [(var_2 any_2) ... (var_3 any_3) ...])]
+  ;if this is reached, no var appears in both shadow list and environment
+  [(shadow (var_s ...) ([var_e any] ...))  ([var_e any] ...)])
 
 
 (define-metafunction Dependent
@@ -476,6 +554,14 @@
   [(argmax/m (number ...)) ,(argmax (λ (x) x) (term (number ...)))])
 
 
+(define-metafunction Dependent
+  all-equal? : (any ...) -> bool
+  [(all-equal? ()) #t]
+  [(all-equal? (any)) #t]
+  [(all-equal? (any_1 any_1 any_2 ...))
+   ,(and (term (all-equal? (any_1 any_2 ...))))]
+  [(all-equal? any) #f])
+
 (module+
  test
  
@@ -483,22 +569,22 @@
  ; expression typing judgment
  ;-------------------
  ; array of numbers
- (check-equal? (judgment-holds (type-of () () (A (3 2) (4 1 6 2 3 5)) type)
+ (check-equal? (judgment-holds (type-of () () () (A (3 2) (4 1 6 2 3 5)) type)
                                type)
                (term ((Array (S 3 2) Num))))
  
  ; array of booleans
- (check-equal? (judgment-holds (type-of () () (A (2) (#f #t)) type)
+ (check-equal? (judgment-holds (type-of () () () (A (2) (#f #t)) type)
                                type)
                (term ((Array (S 2) Bool))))
  
  ; array with wrong number of elements
- (check-equal? (judgment-holds (type-of () () (A (3 2) (4 1 6 2 3)) type)
+ (check-equal? (judgment-holds (type-of () () () (A (3 2) (4 1 6 2 3)) type)
                                type)
                '())
  
  ; array of arrays
- (check-equal? (judgment-holds (type-of () ()
+ (check-equal? (judgment-holds (type-of () () ()
                                         (A (2) ((A (3) (1 2 3))
                                                 (A (3) (4 5 6))))
                                         type)
@@ -508,14 +594,14 @@
  ; simple λ term
  (check-equal?
   (judgment-holds
-   (type-of () () (λ ([x 0 (Array (S) Num)]) (A () (3))) type)
+   (type-of () () () (λ ([x 0 (Array (S) Num)]) (A () (3))) type)
    type)
   (term (((Array (S) Num) -> (Array (S) Num)))))
  
  ; multiargument λ term
  (check-equal?
   (judgment-holds
-   (type-of () () (λ ([x 0 (Array (S 3) Num)]
+   (type-of () () () (λ ([x 0 (Array (S 3) Num)]
                       [y 0 (Array (S 1) Bool)]) (A () (3))) type)
    type)
   (term (((Array (S 3) Num) (Array (S 1) Bool) -> (Array (S) Num)))))
@@ -523,46 +609,168 @@
  ; applying the simple λ term
  (check-equal?
   (judgment-holds
-   (type-of () () ((A () ((λ ([x 0 (Array (S) Num)]) (A () (3)))))
+   (type-of () () () ((A () ((λ ([x 0 (Array (S) Num)]) (A () (3)))))
                    (A () (4)))
             type)
    type)
-  (term ((Array (S) (Array (S) Num)))))
+  (term ((Array (S) Num))))
  
  ; applying the multiargument λ term
  (check-equal?
   (judgment-holds
-   (type-of () () ((A () ((λ ([x 0 (Array (S 3) Num)]
+   (type-of () () () ((A () ((λ ([x 0 (Array (S 3) Num)]
                               [y 0 (Array (S 1) Bool)])
                             (A () (3)))))
                    (A (3) (1 2 3)) (A (1) (#f))) type)
    type)
-  (term ((Array (S) (Array (S) Num)))))
+  (term ((Array (S) Num))))
  
  ; applying to arg with equivalent-but-not-identical type
  (check-equal?
   (judgment-holds
-   (type-of () () ((A () ((λ ([x 2 (Array (S 2 3) Num)]) x)))
+   (type-of () () () ((A () ((λ ([x 2 (Array (S 2 3) Num)]) x)))
                    (A (2) ((A (3) (1 2 3))
                            (A (3) (4 5 6)))))
             type)
    type)
-  (term ((Array (S) (Array (S 2 3) Num)))))
+  (term ((Array (S 2 3) Num))))
  
+ ; applying a nested array of functions
+ (check-equal?
+  (judgment-holds
+   (type-of [] [] [] ((A (3) [(A (2) [(λ ([x 0 (Array (S) Num)]) (A () (1)))
+                                   (λ ([x 0 (Array (S) Num)]) (A () (2)))])
+                           (A (2) [(λ ([x 0 (Array (S) Num)]) (A () (3)))
+                                   (λ ([x 0 (Array (S) Num)]) (A () (4)))])
+                           (A (2) [(λ ([x 0 (Array (S) Num)]) (A () (5)))
+                                   (λ ([x 0 (Array (S) Num)]) (A () (6)))])])
+                   (A (3) (7 23523 245)))
+            type)
+   type)
+  (term ((Array (S 3 2) Num))))
+ 
+ ; type abstraction, and use the bound type variable
+ (check-equal?
+  (judgment-holds
+   (type-of [] [] []
+            (A () [(Λ [elt] (λ ([x 0 (Array (S) elt)]) x))]) type) type)
+  (term ((Array (S) (∀ [elt] ((Array (S) elt) -> (Array (S) elt)))))))
+ ; type abstraction, but use a free type variable (makes an ill-formed type)
+ (check-equal?
+  (judgment-holds
+   (type-of [] [] []
+            (A () [(Λ [elt] (λ ([x 0 (Array (S) foo)]) x))]) type) type)
+  '())
+ 
+ ; type application
+ (check-equal?
+  (judgment-holds
+   (type-of [] [] []
+            (TYPE (A () [(Λ [elt] (λ ([x 0 (Array (S) elt)]) x))]) Bool)
+            type)
+   type)
+  (term ((Array (S) ((Array (S) Bool) -> (Array (S) Bool))))))
  
  ; index application
  ; TODO: find some other function to use, as +'s type is now scalar->scalar
+ ; append is probably a good one (for now, just stick something in environment)
+ (check-equal?
+  (judgment-holds
+   (type-of [] [] [(op (Π ([d1 Nat]) ((Array (S d1) Num)
+                                      -> (Array (S 1 d1) Num))))]
+            (INDEX (A () [op]) 3)
+            type)
+   type)
+  (term ((Array (S) [(Array (S 3) Num) -> (Array (S 1 3) Num)]))))
+ 
  #;(check-equal?
-  (judgment-holds (type-of () () (INDEX + (S 3) (S)) type) type)
-  (term (((Array (S 3) Num)
-          (Array (S) Num)
-          -> (Array (frame [(S 3) 0] [(S) 0]) Num)))))
+    (judgment-holds (type-of () () (INDEX + (S 3) (S)) type) type)
+    (term (((Array (S 3) Num)
+            (Array (S) Num)
+            -> (Array (frame [(S 3) 0] [(S) 0]) Num)))))
  
  ; index application followed by function application
  #;(check-equal?
-  (judgment-holds (type-of () () ((INDEX + (S 3) (S))
-                                  (A (3) (1 2 3)) (A () (10))) type) type)
-  (term ((Array (frame [(S 3) 0] [(S) 0]) Num))))
+    (judgment-holds (type-of () () ((INDEX + (S 3) (S))
+                                    (A (3) (1 2 3)) (A () (10))) type) type)
+    (term ((Array (frame [(S 3) 0] [(S) 0]) Num))))
+ 
+ ; index abstraction
+ (check-equal?
+  (judgment-holds (type-of [][][]
+                           (ל [(d Nat)] (λ [(l 1 (Array (S d) Num))] l))
+                           type) type)
+  (term ((Π [(d Nat)]
+            ((Array (S d) Num)
+             -> (Array (S d) Num))))))
+ 
+ ; make sure abstracted index vars are available for use
+ (check-equal?
+  (judgment-holds
+   (type-of [(d1 Nat) (d2 Nat)]
+            []
+            [(a1 (Array (S d1 d2) Num)) (a2 (Array (S d1 d2) Num))]
+            ([A () (+)] a1 a2)
+            type)
+   type)
+  (term ((Array (S d1 d2) Num))))
+ 
+ ; projection from a dependent sum
+ (check-equal?
+  (judgment-holds
+   (type-of [] [] [(x (Σ [(d1 Nat) (d2 Nat)] (Array (S d1 3 d2) Num)))]
+            (Σ-PROJ x) type) type)
+  (term ((Array (S (Σ-WITNESS d1 x) 3 (Σ-WITNESS d2 x)) Num))))
+ 
+ ; creation of a dependent sum
+ (check-equal?
+  (judgment-holds
+   (type-of [][][]
+            (SUM 3 (A (3) (0 1 2)) (Σ [(d Nat)] (Array (S d) Num)))
+            type)
+   type)
+  (term ((Σ [(d Nat)] (Array (S d) Num)))))
+ ; (projection from a hand-made dependent sum is really a run-time issue)
+ 
+ 
+ ;-------------------
+ ; type and index well-formedness
+ ;-------------------
+ (check-true
+  (judgment-holds (kind-of [] [] [] (Array (S 4 3) Num))))
+ (check-true
+  (judgment-holds (kind-of [] [] [] ((Array (S 4 3) Num) -> Bool))))
+ (check-true
+  (judgment-holds (kind-of ([sh Shape]) [] [] ((Array sh Num) -> Bool))))
+ (check-true
+  (judgment-holds (kind-of ([sh Shape]) [] [] (× (Array sh Num) Bool))))
+ (check-true
+  (judgment-holds (kind-of ([sh Shape]) [] [] (Array sh (× Num Bool)))))
+ (check-true
+  (judgment-holds (kind-of [] [] [] (Π ([sh Shape]) ((Array sh Num) -> Bool)))))
+ (check-true
+  (judgment-holds (kind-of [] [] []
+                           (Π ([sh Shape]) ((Array sh Num) -> Bool)))))
+ (check-true
+  (judgment-holds (kind-of [] [] []
+                           (Π ([len Nat]) ((Array (S 3 len 2) Num) -> Bool)))))
+ (check-true
+  (judgment-holds (kind-of [] [] []
+                           (∀ (elt)
+                              (Π ([fr Shape])
+                                 ((Array fr elt) -> (Array fr elt)))))))
+ ; can tell by position whether a variable indicates a type or an index
+ (check-true
+  (judgment-holds (kind-of [(x Shape)] [(x ★)] []
+                           (Array x x))))
+ ; free index variable
+ (check-false
+  (judgment-holds (kind-of [] [] [] (Array sh Num))))
+ ; free type variable
+ (check-false
+  (judgment-holds (kind-of [] [] [] (Array (S) elt))))
+ 
+ 
  
  ;-------------------
  ; utility metafunctions
@@ -625,4 +833,14 @@
                          ([x Nat]
                           [y Nat]
                           [y Shape])))
-  (term ([z Nat] [y Shape] [x Nat]))))
+  (term ([z Nat] [y Shape] [x Nat])))
+ 
+ 
+ ; exercising the type substitution metafunction
+ (check-equal?
+  (term (type-sub ([elt1 Num] [elt2 (Num -> Bool)])
+                  (∀ (elt3) (Array (S) [(Array (S) elt1)
+                                        -> (Array (S 3) (elt2 -> elt3))]))))
+  (term (∀ (elt3) (Array (S) ((Array (S) Num)
+                              -> (Array (S 3) ((Num -> Bool) -> elt3))))))))
+
