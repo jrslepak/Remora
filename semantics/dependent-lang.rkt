@@ -60,9 +60,6 @@
        (Σ-WITNESS var expr)
        var)
   
-  ; this feels hackish, but the type/index substitution seems to need it
-  (type/idx type idx)
-  
   ; extra machinery for type checking and substitution purposes
   (expr-env (e-bind ...)) (e-bind [var expr])
   (idx-env (i-bind ...)) (i-bind [var idx])
@@ -90,9 +87,9 @@
   [; should probably change this to have premise which calls type env lookup
    (side-condition (display "checking variable"))
    --- variable
-       (type-of sort-env kind-env
-                ([var_0 type_0] ... [var_1 type_1] [var_2 type_2] ...)
-                var_1 type_1)]
+   (type-of sort-env kind-env
+            ([var_0 type_0] ... [var_1 type_1] [var_2 type_2] ...)
+            var_1 type_1)]
   ; primitive operator: call out to metafunction
   [(side-condition (display "checking primop"))
    (where type (primop-type op))
@@ -162,7 +159,7 @@
    ---
    (type-of sort-env kind-env type-env
             (TYPE expr type_arg ...)
-            (Array idx (type-sub [(var type_arg) ...] type)))]
+            (Array idx (type/type-sub [(var type_arg) ...] type)))]
   
   ; index abstraction: extend sort environment, make sure body has correct type
   [(side-condition (display "checking index abstraction"))
@@ -181,19 +178,19 @@
    (sort-of sort-env kind-env type-env idx_arg sort) ...
    --- idx-app
    (type-of sort-env kind-env type-env (INDEX expr idx_arg ...)
-            (Array idx_prod (index-sub ([var idx_arg] ...) type)))]
+            (Array idx_prod (index/type-sub ([var idx_arg] ...) type)))]
   
   ; projection from dependent sum
   [(type-of sort-env kind-env type-env expr (Σ [(var sort) ...] type))
    ---
    (type-of sort-env kind-env type-env (Σ-PROJ expr)
-            (index-sub [(var (Σ-WITNESS var expr))...] type))]
+            (index/type-sub [(var (Σ-WITNESS var expr))...] type))]
   
   ; creation of dependent sum
   [(sort-of sort-env kind-env type-env idx sort) ...
    ; type_subbed in the type-of premise is in a position where metafunctions
    ; don't get evaluated, so we have to evaluate it in a `where' clause
-   (where type_subbed (index-sub [(var idx) ...] type))
+   (where type_subbed (index/type-sub [(var idx) ...] type))
    (type-of sort-env kind-env type-env expr type_subbed)
    ;(where type_0 (canonicalize-type type))
    ---
@@ -367,55 +364,229 @@
 
 
 
+
+
+
+;--------------------------------
+; substitution metafunctions:
+; metafunction name says whether vars represent exprs, types, or idxs
+; and whether they're being substituted into an expr, type, or idx
+; (they cannot be distinguished because a var might be any of them, and
+; making sure exprs become exprs, etc. would require case-> contract anyway)
+;--------------------------------
+; substitute indices into an (element) expression
+(define-metafunction Dependent
+  index/expr-sub : idx-env el-expr -> el-expr
+  [(index/expr-sub idx-env var) var]
+  [(index/expr-sub idx-env base) base]
+  [(index/expr-sub idx-env (A (idx ...) (el-expr ...)))
+   (A ((index/index-sub idx-env idx) ...)
+      ((index/expr-sub idx-env el-expr) ...))]
+  ; function-like forms
+  [(index/expr-sub idx-env (λ [(var num type) ...] expr))
+   (λ [(var num (index/type-sub idx-env type)) ...]
+     (index/expr-sub idx-env expr))]
+  [(index/expr-sub idx-env fun) fun]
+  [(index/expr-sub idx-env (Λ [var ...] expr))
+   (Λ [var ...] (index/expr-sub idx-env expr))]
+  [(index/expr-sub idx-env (ל [(var sort) ...] expr))
+   ; index vars are shadowed by the ל-binder
+   (ל [(var sort) ...] (index/expr-sub (shadow (var ...) idx-env) expr))]
+  ; application forms
+  [(index/expr-sub idx-env (expr_fun expr_arg ...))
+   ((index/expr-sub idx-env expr_fun)
+    (index/expr-sub idx-env expr_arg) ...)]
+  [(index/expr-sub idx-env (TYPE expr_fun type_arg ...))
+   ((index/expr-sub idx-env expr_fun)
+    (index/type-sub idx-env type_arg) ...)]
+  [(index/expr-sub idx-env (INDEX expr_fun idx_arg ...))
+   ((index/expr-sub idx-env expr_fun)
+    (index/expr-sub idx-env idx_arg) ...)]
+  ; dependent sums
+  [(index/expr-sub idx-env (SUM idx ... expr type))
+   (SUM (index/index-sub idx-env idx) ...
+        (index/expr-sub idx-env expr)
+        (index/type-sub idx-env type))]
+  [(index/expr-sub idx-env (Σ-PROJ expr))
+   (Σ-PROJ (index/expr-sub idx-env expr))])
+
 ; substitute indices into a type
 (define-metafunction Dependent
-  index-sub : idx-env type/idx -> type/idx
-  [(index-sub ([var_0 idx_0] ... [var_1 idx_1] [var_2 idx_2] ...) var_1)
+  index/type-sub : idx-env type -> type
+  [(index/type-sub idx-env var) var]
+  [(index/type-sub idx-env base-type) base-type]
+  [(index/type-sub idx-env (Array idx type))
+   (Array (index/index-sub idx-env idx) (index/type-sub idx-env type))]
+  [(index/type-sub idx-env (type_arg ... -> type_result))
+   ((index/type-sub idx-env type_arg) ...
+    -> (index/type-sub idx-env type_result))]
+  [(index/type-sub idx-env (× type ...))
+   (× (index/type-sub idx-env type) ...)]
+  [(index/type-sub idx-env (Π [(var sort) ...] type))
+   (Π [(var sort) ...] (index/type-sub idx-env_shadowed type))
+   (where idx-env_shadowed (shadow (var ...) idx-env))]
+  [(index/type-sub idx-env (Σ [(var sort) ...] type))
+   (Σ [(var sort) ...] (index/type-sub idx-env_shadowed type))
+   (where idx-env_shadowed (shadow (var ...) idx-env))]
+  [(index/type-sub idx-env (∀ [var ...] type))
+   (∀ [var ...] (index/type-sub idx-env type))])
+
+; substitute indices into an index
+(define-metafunction Dependent
+  index/index-sub : idx-env idx -> idx
+  [(index/index-sub ([var_0 idx_0] ... [var_1 idx_1] [var_2 idx_2] ...) var_1)
    idx_1
    (side-condition (not (member (term var_1) (term (var_0 ...)))))]
-  [(index-sub ([var idx] ...) var_free) var_free]
-  ; substituting in types
-  [(index-sub idx-env base-type) base-type]
-  [(index-sub idx-env (Array idx type))
-   (Array (index-sub idx-env idx) (index-sub idx-env type))]
-  [(index-sub idx-env (type_arg ... -> type_result))
-   ((index-sub idx-env type_arg) ... -> (index-sub idx-env type_result))]
-  [(index-sub idx-env (× type ...))
-   (× (index-sub idx-env type) ...)]
-  [(index-sub idx-env (Π [(var sort) ...] type))
-   (Π [(var sort) ...] (index-sub idx-env_shadowed type))
-   (where idx-env_shadowed (shadow (var ...) idx-env))]
-  [(index-sub idx-env (Σ [(var sort) ...] type))
-   (Σ [(var sort) ...] (index-sub idx-env_shadowed type))
-   (where idx-env_shadowed (shadow (var ...) idx-env))]
-  ; substituting in indices
-  [(index-sub idx-env natural) natural]
-  [(index-sub idx-env (S idx ...)) (S (index-sub idx-env idx) ...)]
-  [(index-sub idx-env (frame [idx_shape idx_rank] ...))
-   (frame [(index-sub idx-env idx_shape) (index-sub idx-env idx_rank)] ...)])
+  [(index/index-sub idx-env var) var]
+  [(index/index-sub idx-env natural) natural]
+  [(index/index-sub idx-env (S idx ...)) (S (index/index-sub idx-env idx) ...)]
+  [(index/index-sub idx-env (frame [idx_shape idx_rank] ...))
+   (frame [(index-sub idx-env idx_shape) (index-sub idx-env idx_rank)] ...)]
+  [(index/index-sub idx-env (Σ-WITNESS var expr))
+   (Σ-WITNESS (index/index-sub idx-env var) (index/index-sub idx-env expr))])
+
+; substitute types into an (element) expression
+(define-metafunction Dependent
+  type/expr-sub : type-env el-expr -> el-expr
+  [(type/expr-sub type-env var) var]
+  [(type/expr-sub type-env base) base]
+  [(type/expr-sub type-env (A (idx ...) (el-expr ...)))
+   (A ((type/idx-sub type-env idx) ...)
+      ((type/expr-sub type-env el-expr) ...))]
+  ; function-like forms
+  [(type/expr-sub type-env (λ [(var num type) ...] expr))
+   (λ [(var num (type/type-sub type-env type)) ...]
+     (type/expr-sub type-env expr))]
+  [(type/expr-sub type-env fun) fun]
+  [(type/expr-sub type-env (Λ [var ...] expr))
+   ; shadow type vars
+   (Λ [var ...] (type/expr-sub (shadow (var ...) type-env) expr))]
+  [(type/expr-sub type-env (ל [(var sort) ...] expr))
+   (ל [(var sort) ...] (type/expr-sub type-env expr))]
+  ; application forms
+  [(type/expr-sub type-env (expr_fun expr_arg ...))
+   ((type/expr-sub type-env expr_fun)
+    (type/expr-sub type-env expr_arg) ...)]
+  [(type/expr-sub type-env (TYPE expr type ...))
+   (TYPE (type/expr-sub type-env expr)
+         (type/type-sub type-env type) ...)]
+  [(type/expr-sub type-env (INDEX expr idx ...))
+   (INDEX (type/expr-sub type-env expr)
+          (type/index-sub type-env idx) ...)]
+  ; dependent sums
+  [(type/expr-sub type-env (SUM idx ... expr type))
+   (SUM (type/index-sub type-env idx) ...
+        (type/expr-sub type-env expr)
+        (type/type-sub type-env type))]
+  [(type/expr-sub type-env (Σ-PROJ expr))
+   (Σ-PROJ (type/expr-sub type-env expr))])
 
 ; substitute types into a type
 (define-metafunction Dependent
-  type-sub : ([var type] ...) type -> type
-  [(type-sub ([var_0 type_0] ... [var type] [var_1 type_1] ...) var)
+  type/type-sub : type-env type -> type
+  [(type/type-sub ([var_0 type_0] ... [var type] [var_1 type_1] ...) var)
    type
    (side-condition (not (member (term var) (term (var_0 ...)))))]
-  [(type-sub ([var type] ...) var_free) var_free]
-  [(type-sub ([var_s type_s] ...) (Π ([var_i sort] ...) type_p))
-   (Π ([var_i sort] ...) (type-sub ([var_s type_s] ...) type_p))]
-  [(type-sub ([var_s type_s] ...) (Σ ([var_i sort] ...) type_p))
-   (Σ ([var_i sort] ...) (type-sub ([var_s type_s] ...) type_p))]
-  [(type-sub ([var type_s] ...) (× type_p ...))
-   (× (type-sub ([var type_s] ...) type_p) ...)]
-  [(type-sub ([var type_s] ...) (type_a ... -> type_r))
-   ((type-sub ([var type_s] ...) type_a) ...
-    -> (type-sub ([var type_s] ...) type_r))]
-  [(type-sub ([var type_s] ...) (Array idx type_e))
-   (Array idx (type-sub ([var type_s] ...) type_e))]
-  [(type-sub ([var_s type_s] ...) (∀ (var_b ...) type_q))
-   (∀ (var_b ...) (type-sub (shadow (var_b ...) ([var_s type_s] ...)) type_q))]
-  [(type-sub ([var type_s] ...) base-type) base-type])
-  
+  [(type/type-sub ([var type] ...) var_free) var_free]
+  [(type/type-sub ([var type_s] ...) base-type) base-type]
+  [(type/type-sub type-env (Π ([var_i sort] ...) type))
+   (Π ([var_i sort] ...) (type/type-sub type-env type))]
+  [(type/type-sub type-env (Σ ([var_i sort] ...) type))
+   (Σ ([var_i sort] ...) (type/type-sub type-env type))]
+  [(type/type-sub type-env (× type ...))
+   (× (type/type-sub type-env type) ...)]
+  [(type/type-sub type-env (type_a ... -> type_r))
+   ((type/type-sub type-env type_a) ...
+    -> (type/type-sub type-env type_r))]
+  [(type/type-sub type-env (Array idx type_e))
+   (Array idx (type/type-sub type-env type_e))]
+  [(type/type-sub type-env (∀ (var_b ...) type_q))
+   (∀ (var_b ...)
+      (type/type-sub (shadow (var_b ...) type-env) type_q))])
+
+; substitute types into an index
+(define-metafunction Dependent
+  type/index-sub : type-env idx -> idx
+  [(type/index-sub type-env var) var]
+  [(type/index-sub type-env natural) natural]
+  [(type/index-sub type-env (S idx ...))
+   (S (type/index-sub type-env idx) ...)]
+  [(type/index-sub type-env (frame [idx_s idx_r] ...))
+   (frame [(type/index-sub type-env idx_s)
+           (type/index-sub type-env idx_r)] ...)]
+  [(type/index-sub type-env (Σ-WITNESS var expr))
+   (Σ-WITNESS var (type/expr-sub type-env expr))])
+
+; substitute (element) expressions into an (element) expression
+(define-metafunction Dependent
+  expr/expr-sub : expr-env el-expr -> el-expr
+  [(expr/expr-sub ([var_0 expr_0] ... [var expr] [var_1 expr_1] ...) var)
+   expr
+   (side-condition (not (member (term var) (term (var_0 ...)))))]
+  [(expr/expr-sub expr-env var) var]
+  [(expr/expr-sub expr-env (A (idx ...) (expr_elt ...)))
+   (A (idx ...) ((expr/expr-sub expr-env expr_elt) ...))]
+  ; function-like forms
+  [(expr/expr-sub expr-env (λ ([var num type] ...) expr_body))
+   (λ ([var num type] ...)
+     (expr/expr-sub (shadow (var ...) expr-env) expr-body))]
+  ; covers op and c-op
+  [(expr/expr-sub expr-env fun) fun]
+  [(expr/expr-sub expr-env (Λ ([var] ...) expr_body))
+   ; type variables do not shadow term variables (whether a variable represents
+   ; a term, type, or index is evident from is position)
+   (Λ ([var] ...) (expr/expr-sub expr-env expr-body))]
+  [(expr/expr-sub expr-env (ל ([var sort] ...) expr_body))
+   ; index variables do not shadow term variables
+   (ל ([var sort] ...) (expr/expr-sub expr-env expr-body))]
+  ; application forms
+  [(expr/expr-sub expr-env (expr_fun expr_arg ...))
+   ((expr/expr-sub expr-env expr_fun) (expr/expr-sub expr-env expr_arg) ...)]
+  [(expr/expr-sub expr-env (TYPE expr_fun type_arg ...))
+   (TYPE (expr/expr-sub expr-env expr_fun)
+         (expr/type-sub expr-env type_arg) ...)]
+  [(expr/expr-sub expr-env (INDEX expr_fun idx_arg ...))
+   (INDEX (expr/expr-sub expr-env expr_fun)
+          (expr/idx-sub expr-env idx_arg) ...)]
+  ; dependent sums
+  [(expr/expr-sub expr-env (SUM idx ... expr type))
+   (SUM (expr/idx-sub expr-env idx) ...
+        (expr/expr-sub expr-env expr)
+        (expr/type-sub expr-env type))]
+  [(expr/expr-sub expr-env (Σ-PROJ expr))
+   (Σ-PROJ (expr/expr-sub expr-env expr))])
+
+; substitute expressions into a type
+(define-metafunction Dependent
+  expr/type-sub : expr-env type -> type
+  [(expr/type-sub expr-env var) var]
+  [(expr/type-sub expr-env base-type) base-type]
+  [(expr/type-sub expr-env (Array idx type))
+   (Array (expr/idx-sub expr-env idx) (expr/type-sub expr-env type))]
+  [(expr/type-sub expr-env (× type ...))
+   (× (expr/type-sub expr-env type) ...)]
+  [(expr/type-sub expr-env (type_a ... -> type_r))
+   ((expr/type-sub expr-env type_a) ...
+    -> (expr/type-sub expr-env type_r))]
+  [(expr/type-sub expr-env (∀ [var ...] type))
+   (∀ [var ...] (expr/type-sub expr-env type))]
+  [(expr/type-sub expr-env (Π [(var sort) ...] type))
+   (Π [(var sort) ...] (expr/type-sub expr-env type))]
+  [(expr/type-sub expr-env (Σ [(var sort) ...] type))
+   (Σ [(var sort) ...] (expr/type-sub expr-env type))])
+
+; substitute expressions into an index
+(define-metafunction Dependent
+  expr/index-sub : expr-env type -> type
+  [(expr/index-sub expr-env var) var]
+  [(expr/index-sub expr-env natural) natural]
+  [(expr/index-sub expr-env (S idx ...))
+   (S (expr/index-sub expr-env idx) ...)]
+  [(expr/index-sub expr-env (frame [idx_s idx_r] ...))
+   (frame [((expr/index-sub expr-env idx_s)
+            (expr/index-sub expr-env idx_r)) ...])]
+  [(expr/index-sub expr-env (Σ-WITNESS var expr))
+   (Σ-WITNESS var (expr/index-sub expr-env expr))])
 
 
 ; reduce a type to canonical form:
@@ -602,7 +773,7 @@
  (check-equal?
   (judgment-holds
    (type-of () () () (λ ([x 0 (Array (S 3) Num)]
-                      [y 0 (Array (S 1) Bool)]) (A () (3))) type)
+                         [y 0 (Array (S 1) Bool)]) (A () (3))) type)
    type)
   (term (((Array (S 3) Num) (Array (S 1) Bool) -> (Array (S) Num)))))
  
@@ -610,7 +781,7 @@
  (check-equal?
   (judgment-holds
    (type-of () () () ((A () ((λ ([x 0 (Array (S) Num)]) (A () (3)))))
-                   (A () (4)))
+                      (A () (4)))
             type)
    type)
   (term ((Array (S) Num))))
@@ -619,9 +790,9 @@
  (check-equal?
   (judgment-holds
    (type-of () () () ((A () ((λ ([x 0 (Array (S 3) Num)]
-                              [y 0 (Array (S 1) Bool)])
-                            (A () (3)))))
-                   (A (3) (1 2 3)) (A (1) (#f))) type)
+                                 [y 0 (Array (S 1) Bool)])
+                               (A () (3)))))
+                      (A (3) (1 2 3)) (A (1) (#f))) type)
    type)
   (term ((Array (S) Num))))
  
@@ -629,8 +800,8 @@
  (check-equal?
   (judgment-holds
    (type-of () () () ((A () ((λ ([x 2 (Array (S 2 3) Num)]) x)))
-                   (A (2) ((A (3) (1 2 3))
-                           (A (3) (4 5 6)))))
+                      (A (2) ((A (3) (1 2 3))
+                              (A (3) (4 5 6)))))
             type)
    type)
   (term ((Array (S 2 3) Num))))
@@ -639,12 +810,12 @@
  (check-equal?
   (judgment-holds
    (type-of [] [] [] ((A (3) [(A (2) [(λ ([x 0 (Array (S) Num)]) (A () (1)))
-                                   (λ ([x 0 (Array (S) Num)]) (A () (2)))])
-                           (A (2) [(λ ([x 0 (Array (S) Num)]) (A () (3)))
-                                   (λ ([x 0 (Array (S) Num)]) (A () (4)))])
-                           (A (2) [(λ ([x 0 (Array (S) Num)]) (A () (5)))
-                                   (λ ([x 0 (Array (S) Num)]) (A () (6)))])])
-                   (A (3) (7 23523 245)))
+                                      (λ ([x 0 (Array (S) Num)]) (A () (2)))])
+                              (A (2) [(λ ([x 0 (Array (S) Num)]) (A () (3)))
+                                      (λ ([x 0 (Array (S) Num)]) (A () (4)))])
+                              (A (2) [(λ ([x 0 (Array (S) Num)]) (A () (5)))
+                                      (λ ([x 0 (Array (S) Num)]) (A () (6)))])])
+                      (A (3) (7 23523 245)))
             type)
    type)
   (term ((Array (S 3 2) Num))))
@@ -835,12 +1006,13 @@
                           [y Shape])))
   (term ([z Nat] [y Shape] [x Nat])))
  
- 
+ ; TODO: need more substitution tests
  ; exercising the type substitution metafunction
  (check-equal?
-  (term (type-sub ([elt1 Num] [elt2 (Num -> Bool)])
-                  (∀ (elt3) (Array (S) [(Array (S) elt1)
-                                        -> (Array (S 3) (elt2 -> elt3))]))))
+  (term (type/type-sub
+         ([elt1 Num] [elt2 (Num -> Bool)])
+         (∀ (elt3) (Array (S) [(Array (S) elt1)
+                               -> (Array (S 3) (elt2 -> elt3))]))))
   (term (∀ (elt3) (Array (S) ((Array (S) Num)
                               -> (Array (S 3) ((Num -> Bool) -> elt3))))))))
 
