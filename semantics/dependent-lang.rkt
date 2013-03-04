@@ -1,5 +1,8 @@
 #lang racket
 
+; TODO: make sure typing doesn't require things that are valid top-level
+; exprs to be scalar-wrapped
+
 (require rackunit
          redex
          "language.rkt"
@@ -73,7 +76,7 @@
 ; need a kind-env ::= (var ...), and have to check that type variables are bound
 ; before they are used (they can appear in λ, Λ, ל, and TYPE forms)
 (define-judgment-form Dependent
-  #:contract (type-of sort-env kind-env type-env expr type)
+  #:contract (type-of sort-env kind-env type-env el-expr type)
   #:mode (type-of I I I I O)
   ; array: find element type, check for correct number of elements
   [(side-condition (display "checking array"))
@@ -153,13 +156,16 @@
   
   ; type application
   [(side-condition (display "checking type application"))
-   (type-of sort-env kind-env type-env expr
-            (Array idx (∀ (var ...) type)))
+   (type-of sort-env kind-env type-env expr (∀ (var ...) type))
    (kind-of sort-env kind-env type-env type_arg) ...
+   ; make sure array types never get bound -- this restriction is needed for
+   ; making function's input types fully determine its expected argument rank
+   (side-condition (all-non-array type_arg ...))
+   ;(side-condition ((λ (x) (x x)) (λ (x) (x x))))
    ---
    (type-of sort-env kind-env type-env
             (TYPE expr type_arg ...)
-            (Array idx (type/type-sub [(var type_arg) ...] type)))]
+            (type/type-sub [(var type_arg) ...] type))]
   
   ; index abstraction: extend sort environment, make sure body has correct type
   [(side-condition (display "checking index abstraction"))
@@ -265,12 +271,12 @@
   #:mode (type-of/elts I I I I O)
   ; TODO: empty arrays will need either annotation or special casing
   ; as it stands now, they check as empty arrays of base type
-  [(type-of sort-env kind-env type-env expr_0 type_0)
-   (type-of sort-env kind-env type-env expr_1 type_1) ...
+  [(type-of sort-env kind-env type-env el-expr_0 type_0)
+   (type-of sort-env kind-env type-env el-expr_1 type_1) ...
    (side-condition (term (all-equal? [(canonicalize-type type_0)
                                       (canonicalize-type type_1) ...])))
    --- non-base-elt
-   (type-of/elts sort-env kind-env type-env (expr_0 expr_1 ...) type_0)]
+   (type-of/elts sort-env kind-env type-env (el-expr_0 el-expr_1 ...) type_0)]
   ; simple cases are base types (this is the only place where raw base-typed
   ; values can appear)
   [--- num-elt
@@ -321,12 +327,12 @@
 
 ; find the arg rank associated with a function type
 (define-metafunction Dependent
-  type->arg-rank : type -> (natural ...)
+  type->arg-rank : type -> (number ...)
   [(type->arg-rank (type_arg ... -> type_result)) ((type->rank type_arg) ...)])
 ; find the rank associated with an array type
 ; not for use with an open type
 (define-metafunction Dependent
-  type->rank : type -> natural
+  type->rank : type -> number
   ; collapse nested array types
   #;[(type->rank (Array (S idx_outer ...) (Array (S idx_inner ...) type)))
      ,(+ (length (term (idx_outer ...)))
@@ -334,6 +340,7 @@
          (term (type->rank type)))]
   [(type->rank (Array (S idx ...) type))
    ,(+ (length (term (idx ...))) (term (type->rank type)))]
+  [(type->rank (Array var type)) +inf.0]
   ; for now, pretending all other possible element types are scalar
   ; more detailed handling of Σ types might be awkward/impossible
   [(type->rank type) 0])
@@ -352,6 +359,15 @@
    (where (idx_frame-dim ...)
           (drop-right/m (idx_dim ...) natural_rank))])
 
+; make sure that none of the types are of the form (Array ___ ___)
+; used in type application rule
+(define-metafunction Dependent
+  all-non-array : type ... -> bool
+  [(all-non-array type_arg ...)
+   ,(for/and ([t (term (type_arg ...))])
+      ;(displayln t)
+      (not (redex-match Dependent (Array idx type) t)))])
+
 (define-metafunction Dependent
   primop-type : fun -> type
   [(primop-type +) ((Array (S) Num)
@@ -362,8 +378,34 @@
                          (Array s2 Num)
                          -> (Array (frame [s1 0] [s2 0]) Num)))])
 
-
-
+; determine the argument ranks a function expects
+(define-metafunction Dependent
+  fun-rank : expr -> (num ...)
+  [(fun-rank expr)
+   (fun-rank/type type_f)
+   (where (type_f type_other ...)
+          ,(judgment-holds (type-of [] [] [] expr type) type))])
+; determine the argument ranks a function of a given type would expect
+(define-metafunction Dependent
+  fun-rank/type : type -> (num ...)
+  [(fun-rank/type (type_a ... -> type_r))
+   ((fun-rank/single (canonicalize-type type_a)) ...)]
+  [(fun-rank/type (Π ([var sort] ...) type))
+   (fun-rank/type type)]
+  [(fun-rank/type (Σ ([var sort] ...) type))
+   (fun-rank/type type)]
+  [(fun-rank/type (∀ ([var] ...) type))
+   (fun-rank/type type)]
+  [(fun-rank/type (Array idx type))
+   (fun-rank/type type)])
+; determine the expected argument rank associated with an argument type
+(define-metafunction Dependent
+  fun-rank/single : type -> num
+  [(fun-rank/single (Array var (Array idx type))) +inf.0]
+  [(fun-rank/single (Array (S idx ...) (Array var type)))
+   ,(- (length (term (idx ...))))]
+  [(fun-rank/single (Array var type)) +inf.0]
+  [(fun-rank/single (Array (S idx ...) type)) ,(length (term (idx ...)))])
 
 
 
@@ -596,6 +638,7 @@
   canonicalize-type : type -> type
   ; some types are already in canonical form
   [(canonicalize-type base-type) base-type]
+  [(canonicalize-type var) var]
   ; no reducing inside the body (actually, it's probably safe to do so)
   [(canonicalize-type (Π [(var sort) ...] type)) (Π [(var sort) ...] type)]
   [(canonicalize-type (Σ [(var sort) ...] type)) (Σ [(var sort) ...] type)]
@@ -613,11 +656,17 @@
    (side-condition (not (redex-match Dependent (Array idx type) (term type))))]
   ; if it is another array, we need to collapse the nested array type into
   ; a flat array type
-  [(canonicalize-type (Array idx type))
+  ; TODO: need to check whether inner or outer index is a variable instead of
+  ; a shape literal -- if it is a variable, canonical form is still nested
+  [(canonicalize-type (Array (S idx_outer ...) type))
    ; may need multiple steps of reduction
-   (canonicalize-type (Array (nest-shape idx idx_cell) type_elt))
-   (where (Array idx_cell type_elt) type)]
-  )
+   (canonicalize-type (Array (S idx_outer ... idx_inner ...) type_elt))
+   (where (Array (S idx_inner ...) type_elt) type)]
+  [(canonicalize-type (Array (S idx_outer ...) type))
+   (Array (S idx_outer ...) (canonicalize-type type))]
+  [(canonicalize-type (Array var type))
+   (Array var (canonicalize-type type))])
+
 ; reduce an index to canonical form
 (define-metafunction Dependent
   canonicalize-index : idx -> idx
@@ -630,6 +679,7 @@
   [(canonicalize-index (frame [idx_rank idx_shape] ...))
    (frame-shape [(canonicalize-index idx_rank) ...]
                 [(canonicalize-index idx_shape) ...])])
+
 ; find the shape that comes from nesting one shape inside another
 (define-metafunction Dependent
   nest-shape : idx idx ... -> idx
@@ -824,20 +874,24 @@
  (check-equal?
   (judgment-holds
    (type-of [] [] []
-            (A () [(Λ [elt] (λ ([x 0 (Array (S) elt)]) x))]) type) type)
-  (term ((Array (S) (∀ [elt] ((Array (S) elt) -> (Array (S) elt)))))))
+            (Λ [elt] (A [] [(λ ([x 0 (Array (S) elt)]) x)]))
+            type) type)
+  (term ((∀ [elt] (Array (S)
+                         ((Array (S) elt) -> (Array (S) elt)))))))
  ; type abstraction, but use a free type variable (makes an ill-formed type)
  (check-equal?
   (judgment-holds
    (type-of [] [] []
-            (A () [(Λ [elt] (λ ([x 0 (Array (S) foo)]) x))]) type) type)
+            (Λ [elt] (A [] [(λ ([x 0 (Array (S) foo)]) x)]))
+            type) type)
   '())
  
  ; type application
  (check-equal?
   (judgment-holds
    (type-of [] [] []
-            (TYPE (A () [(Λ [elt] (λ ([x 0 (Array (S) elt)]) x))]) Bool)
+            (TYPE (Λ [elt] (A [] [(λ ([x 0 (Array (S) elt)]) x)]))
+                  Bool)
             type)
    type)
   (term ((Array (S) ((Array (S) Bool) -> (Array (S) Bool))))))
@@ -869,11 +923,13 @@
  ; index abstraction
  (check-equal?
   (judgment-holds (type-of [][][]
-                           (ל [(d Nat)] (λ [(l 1 (Array (S d) Num))] l))
+                           (ל [(d Nat)]
+                              (A [] [(λ [(l 1 (Array (S d) Num))] l)]))
                            type) type)
   (term ((Π [(d Nat)]
-            ((Array (S d) Num)
-             -> (Array (S d) Num))))))
+            (Array (S)
+                   ((Array (S d) Num)
+                    -> (Array (S d) Num)))))))
  
  ; make sure abstracted index vars are available for use
  (check-equal?

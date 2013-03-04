@@ -1,15 +1,17 @@
 #lang racket
 
+; TODO: boxes (e.g. for type-erasing array of dependent sums)
+
 (require rackunit
          redex)
 (provide Arrays
-         take/m drop/m take-right/m drop-right/m prefix?)
+         take/m drop/m take-right/m drop-right/m prefix?
+         shape)
 
 (define-language Arrays
   (expr (expr expr ...)
           arr
-          var
-          fun)
+          var)
   (el-expr expr elt)
   
   ; array elements: base data and functions
