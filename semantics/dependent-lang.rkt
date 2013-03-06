@@ -1,8 +1,5 @@
 #lang racket
 
-; TODO: make sure typing doesn't require things that are valid top-level
-; exprs to be scalar-wrapped
-
 (require rackunit
          redex
          "language.rkt"
@@ -30,10 +27,16 @@
   ; allow arrays of types and sorts? or are arrays strictly value-level?
   
   ; have to include type annotations in λ syntax
-  ; TODO: with parametric polymorphism, is rank annotation still needed?
-  (fun (λ [(var num type) ...] expr)
+  (fun (λ [(var type) ...] expr)
        op
        c-op)
+  
+  ; evaluation contexts -- need typed semantics to show type erasure "works"
+  (E ....
+     (TYPE E type ...)
+     (INDEX E idx ...)
+     (Σ-PROJ E)
+     (SUM idx ... E type))
   
   ; type-level pieces
   (type (Π [(var sort) ...] type)
@@ -46,6 +49,9 @@
         var
         base-type)
   (base-type Num Bool)
+  ; an array type, but with a hole where the element type should be
+  (frame-struct (Array idx frame-struct)
+                (Array idx hole))
   
   ; sort-level pieces
   ; constraint domain would probably be something like nat lists
@@ -57,7 +63,7 @@
        ; handled via metafunction once actual indices known
        ; we require [shape naturalized-rank] pairs
        ; TODO: probably going to need more operations on shapes eventually
-       ; addition, multiplication
+       ; addition, multiplication?
        (frame [idx idx] ...)
        ; extract the `var' witness from dependent sum
        (Σ-WITNESS var expr)
@@ -70,6 +76,14 @@
   (kind-env (k-bind ...)) (k-bind [var ★]) ; may later need [var kind]
   (sort-env (s-bind ...)) (s-bind [var sort]))
 
+(caching-enabled? #f) ; useful for testing purposes
+(define-metafunction Dependent
+  displayln/m : any -> any
+  [(displayln/m any)
+   #t
+   (side-condition (displayln (term any)))])
+
+
 
 ; type check an expression (or single element expression) in the
 ; dependently-typed version of the language
@@ -79,8 +93,7 @@
   #:contract (type-of sort-env kind-env type-env el-expr type)
   #:mode (type-of I I I I O)
   ; array: find element type, check for correct number of elements
-  [(side-condition (display "checking array"))
-   (type-of/elts sort-env kind-env type-env (el-expr ...) type)
+  [(type-of/elts sort-env kind-env type-env (el-expr ...) type)
    (side-condition (size-check (A (natural ...) (el-expr ...))))
    --- array
    (type-of sort-env kind-env type-env
@@ -88,88 +101,65 @@
             (Array (S natural ...) type))]
   ; variable: grab from environment (not there -> ill-typed)
   [; should probably change this to have premise which calls type env lookup
-   (side-condition (display "checking variable"))
    --- variable
    (type-of sort-env kind-env
             ([var_0 type_0] ... [var_1 type_1] [var_2 type_2] ...)
             var_1 type_1)]
   ; primitive operator: call out to metafunction
-  [(side-condition (display "checking primop"))
-   (where type (primop-type op))
+  [(where type (primop-type op))
    --- operator
    (type-of sort-env kind-env type-env op type)]
   ; λ abstraction: add inputs to type environment, check body
-  [(side-condition (display "checking λ abstraction"))
-   (kind-of sort-env kind-env type-env type_arg) ...
+  [(kind-of sort-env kind-env type-env type_arg) ...
    (type-of sort-env kind-env (type-env-update [var type_arg] ... type-env)
             expr type_body)
    --- lambda
    (type-of sort-env kind-env type-env
-            (λ [(var num type_arg) ...] expr)
+            (λ [(var type_arg) ...] expr)
             (type_arg ... -> type_body))]
   ; function app: check that args are equivalent to what function expects
   [; first, identify function's and args' types (need a handle on their shapes)
-   (side-condition (display "checking function application"))
    (type-of sort-env kind-env type-env expr_fun type_fun)
    (type-of sort-env kind-env type-env expr_arg type_arg) ...
    ; get canonical types for the function & argument arrays
-   (where (Array idx_fun-shape (type_input0 ... -> type_output))
+   (where (Array idx_fun-shape (type_expected ... -> type_output))
           (canonicalize-type type_fun))
    (where [(Array idx_arg-shape type_arg-elt) ...]
           [(canonicalize-type type_arg) ...])
-   ; extract expected rank of function array's elements
-   (where (natural_arg-rank ...)
-          (type->arg-rank (type_input0 ... -> type_output)))
-   (side-condition (display (term expr_fun)))
-   ; determine the frame of the implicit `apply'
-   ; it's the approrpriate-sized prefix of the shape with the highest overrank
-   (where (natural_app-rank ...) (0 natural_arg-rank ...))
-   (where (natural_term-rank ...)
-          ((shape->rank idx_fun-shape) (shape->rank idx_arg-shape) ...))
-   ; originally had natural_app-frame, but axes might be variables too
-   (where (S idx_app-frame ...)
-          (frame-shape (natural_app-rank ...)
-                       (idx_fun-shape idx_arg-shape ...)))
-   ; if they are, they'd better be have sort Nat
-   (sort-of sort-env kind-env type-env idx_app-frame Nat) ...
-   ; make sure all terms can lift into this frame, i.e. each term's individual
-   ; frame shape is a prefix of apply's frame shape
-   ; this requires dropping the cell parts of all terms' shapes
-   (side-condition
-    (prefix-agree? (S idx_app-frame ...)
-                   ; non-cell parts of terms' shapes
-                   ((exclude-cell 0 idx_fun-shape)
-                    (exclude-cell natural_arg-rank idx_arg-shape) ...)))
+   ; determine the frame of the implicit `apply':
+   ; - find what each function/arg array contributes to the frame
+   (where (frame-struct_pieces ...)
+          ; the part for the function is the shape of the function array
+          ((Array idx_fun-shape hole)
+           ; the part for the args is based on the expected and actual types
+           (frame-contribution type_expected
+                               (Array idx_arg-shape type_arg-elt)) ...))
+   ; - the largest contribution (by prefix ordering) is the frame
+   (where frame-struct_max (largest-frame (frame-struct_pieces ...)))
    --- fun-app
    (type-of sort-env kind-env type-env
             (expr_fun expr_arg ...)
-            (canonicalize-type (Array (S idx_app-frame ...) type_output)))]
-  
+            (canonicalize-type (in-hole frame-struct_max type_output)))]
   ; type abstraction: 
   [; here is where we need the kind-env (extend here, check in other rules)
-   (side-condition (display "checking type abstraction"))
    (type-of sort-env (kind-env-update [var ★] ... kind-env) type-env
             expr_body type)
    ---
    (type-of sort-env kind-env type-env
             (Λ [var ...] expr_body) (∀ [var ...] type))]
-  
   ; type application
-  [(side-condition (display "checking type application"))
-   (type-of sort-env kind-env type-env expr (∀ (var ...) type))
+  [(type-of sort-env kind-env type-env expr (∀ (var ...) type))
    (kind-of sort-env kind-env type-env type_arg) ...
    ; make sure array types never get bound -- this restriction is needed for
    ; making function's input types fully determine its expected argument rank
    (side-condition (all-non-array type_arg ...))
-   ;(side-condition ((λ (x) (x x)) (λ (x) (x x))))
    ---
    (type-of sort-env kind-env type-env
             (TYPE expr type_arg ...)
             (type/type-sub [(var type_arg) ...] type))]
   
   ; index abstraction: extend sort environment, make sure body has correct type
-  [(side-condition (display "checking index abstraction"))
-   (type-of (sort-env-update [var sort] ... sort-env)
+  [(type-of (sort-env-update [var sort] ... sort-env)
             kind-env type-env expr type)
    ---
    (type-of sort-env kind-env type-env
@@ -177,8 +167,7 @@
             (Π [(var sort) ...] type))]
   
   ; index app: check that indices have proper sort, substitute indices into type
-  [(side-condition (display "checking index application"))
-   (type-of sort-env kind-env type-env expr
+  [(type-of sort-env kind-env type-env expr
             (Array idx_prod (Π ([var sort] ...) type)))
    (sort-of sort-env kind-env type-env idx_prod Shape)
    (sort-of sort-env kind-env type-env idx_arg sort) ...
@@ -292,28 +281,73 @@
                                                 (length (term (el-expr ...))))])
 
 ; determine the frame shape associated with a lifting instance
+; TODO: metafunctions used by f'n app type rule probably make this superfluous
+;  right now, only canonicalize-index uses this, and only for handling
+;  the `frame' index-level computation form
 ; TODO: check for prefix agreement
 ;  should reject (term (frame-shape (frame [0 (S 3)] [0 (S 2)])))
 (define-metafunction Dependent
   frame-shape : (natural ...) (idx ...) -> idx
   [(frame-shape (natural_rank ...) (idx ...))
    (S idx_frame-dim ...)
+   
    ; how overranked is each term?
    (where (natural_over ...)
           ((-/m (shape->rank idx) natural_rank) ...))
-   ;(side-condition (displayln (term (natural_over ...))))
    ; position of highest overrank?
-   ;(side-condition (displayln (argmax first (term ([natural_over idx] ...)))))
    (where (natural_overrank (S idx_dim ...))
           ,(argmax first (term ([natural_over idx] ...))))
-   ;(side-condition (displayln (term (natural_overrank (S idx_dim ...)))))
    ; extract prefix
-   (where (idx_frame-dim ...) (take/m (idx_dim ...) natural_overrank))
-   
-   ;(side-condition (displayln ""))
-   ; check that extracted prefix is a prefix of the other shapes
-   ;(side-condition (term (prefix-agree? 
-   ])
+   (where (idx_frame-dim ...) (take/m (idx_dim ...) natural_overrank))])
+
+; identify what an argument's expected and actual types require
+; as a prefix of the function application frame
+; TODO: there are probably other cases to consider
+(define-metafunction Dependent
+  frame-contribution : type type -> frame-struct
+  [(frame-contribution (Array var_i type_cell)
+                       (Array var_i type_cell)) (Array (S) hole)]
+  [(frame-contribution (Array var_i type_cell)
+                       (Array var_j type_cell)) #f]
+  [(frame-contribution (Array var_i type_cell) type_actual) (Array var_i hole)]
+  [(frame-contribution (Array (S) type) (Array idx type)) (Array idx hole)]
+  [(frame-contribution (Array (S) type) (Array idx_1 (Array idx_2 type)))
+   (Array idx_1 (Array idx_2 hole))]
+  [(frame-contribution (Array (S idx_0 ...) type)
+                       (Array (S idx_0 ... idx_1 ...) type))
+   (Array (S idx_1 ...) hole)])
+
+; find the frame-struct that is prefixed by all other frame-structs in the list
+; this is essentially a left fold with larger-frame
+(define-metafunction Dependent
+  largest-frame : (frame-struct ...) -> frame-struct or #f
+  [(largest-frame ()) #f]
+  [(largest-frame (frame-struct)) frame-struct]
+  [(largest-frame (frame-struct_0 frame-struct_1 frame-struct_rest ...))
+   (largest-frame (frame-struct_l frame-struct_rest ...))
+   (where frame-struct_l (larger-frame frame-struct_0 frame-struct_1))]
+  [(largest-frame (frame-struct_0 frame-struct_1 frame-struct_rest ...))
+   #f
+   (side-condition (printf "incomparable frame-structs: ~a and ~a\n"
+                           (term frame-struct_0)
+                           (term frame-struct_1)))])
+; select the frame-struct which is guaranteed to have the other as its prefix
+; TODO: there are probably other cases to consider
+(define-metafunction Dependent
+  larger-frame : frame-struct frame-struct -> frame-struct or #f
+  ; given same argument twice, return it
+  [(larger-frame frame-struct frame-struct) frame-struct]
+  ; if one frame is scalar, return the other
+  [(larger-frame (Array (S) hole) frame-struct) frame-struct]
+  [(larger-frame frame-struct (Array (S) hole)) frame-struct]
+  [(larger-frame (Array (S idx_0 ...) hole)
+                 (Array (S idx_0 ... idx_1 ...) hole))
+   (Array (S idx_0 ... idx_1 ...) hole)]
+  [(larger-frame (Array (S idx_0 ... idx_1 ...) hole)
+                 (Array (S idx_0 ...) hole))
+   (Array (S idx_0 ... idx_1 ...) hole)]
+  ; catch-all case for those that failed to match any of the above
+  [(larger-frame frame-struct_1 frame-struct_2) #f])
 
 ; determine whether a shape is a prefix of other shapes
 (define-metafunction Dependent
@@ -347,6 +381,7 @@
 
 ; find the rank associated with a given shape
 ; TODO: add clauses for index-level computation forms
+; TODO: or make sure this metafunction is no longer needed
 (define-metafunction Dependent
   shape->rank : idx -> natural
   [(shape->rank (S idx ...)) ,(length (term (idx ...)))])
@@ -426,7 +461,7 @@
       ((index/expr-sub idx-env el-expr) ...))]
   ; function-like forms
   [(index/expr-sub idx-env (λ [(var num type) ...] expr))
-   (λ [(var num (index/type-sub idx-env type)) ...]
+   (λ [(var (index/type-sub idx-env type)) ...]
      (index/expr-sub idx-env expr))]
   [(index/expr-sub idx-env fun) fun]
   [(index/expr-sub idx-env (Λ [var ...] expr))
@@ -496,8 +531,8 @@
    (A ((type/idx-sub type-env idx) ...)
       ((type/expr-sub type-env el-expr) ...))]
   ; function-like forms
-  [(type/expr-sub type-env (λ [(var num type) ...] expr))
-   (λ [(var num (type/type-sub type-env type)) ...]
+  [(type/expr-sub type-env (λ [(var type) ...] expr))
+   (λ [(var (type/type-sub type-env type)) ...]
      (type/expr-sub type-env expr))]
   [(type/expr-sub type-env fun) fun]
   [(type/expr-sub type-env (Λ [var ...] expr))
@@ -569,8 +604,8 @@
   [(expr/expr-sub expr-env (A (idx ...) (expr_elt ...)))
    (A (idx ...) ((expr/expr-sub expr-env expr_elt) ...))]
   ; function-like forms
-  [(expr/expr-sub expr-env (λ ([var num type] ...) expr_body))
-   (λ ([var num type] ...)
+  [(expr/expr-sub expr-env (λ ([var type] ...) expr_body))
+   (λ ([var type] ...)
      (expr/expr-sub (shadow (var ...) expr-env) expr-body))]
   ; covers op and c-op
   [(expr/expr-sub expr-env fun) fun]
@@ -658,6 +693,7 @@
   ; a flat array type
   ; TODO: need to check whether inner or outer index is a variable instead of
   ; a shape literal -- if it is a variable, canonical form is still nested
+  [(canonicalize-type (Array (S) (Array idx type))) (Array idx type)]
   [(canonicalize-type (Array (S idx_outer ...) type))
    ; may need multiple steps of reduction
    (canonicalize-type (Array (S idx_outer ... idx_inner ...) type_elt))
@@ -815,22 +851,22 @@
  ; simple λ term
  (check-equal?
   (judgment-holds
-   (type-of () () () (λ ([x 0 (Array (S) Num)]) (A () (3))) type)
+   (type-of () () () (λ ([x (Array (S) Num)]) (A () (3))) type)
    type)
   (term (((Array (S) Num) -> (Array (S) Num)))))
  
  ; multiargument λ term
  (check-equal?
   (judgment-holds
-   (type-of () () () (λ ([x 0 (Array (S 3) Num)]
-                         [y 0 (Array (S 1) Bool)]) (A () (3))) type)
+   (type-of () () () (λ ([x (Array (S 3) Num)]
+                         [y (Array (S 1) Bool)]) (A () (3))) type)
    type)
   (term (((Array (S 3) Num) (Array (S 1) Bool) -> (Array (S) Num)))))
  
  ; applying the simple λ term
  (check-equal?
   (judgment-holds
-   (type-of () () () ((A () ((λ ([x 0 (Array (S) Num)]) (A () (3)))))
+   (type-of () () () ((A () ((λ ([x (Array (S) Num)]) (A () (3)))))
                       (A () (4)))
             type)
    type)
@@ -839,8 +875,8 @@
  ; applying the multiargument λ term
  (check-equal?
   (judgment-holds
-   (type-of () () () ((A () ((λ ([x 0 (Array (S 3) Num)]
-                                 [y 0 (Array (S 1) Bool)])
+   (type-of () () () ((A () ((λ ([x (Array (S 3) Num)]
+                                 [y (Array (S 1) Bool)])
                                (A () (3)))))
                       (A (3) (1 2 3)) (A (1) (#f))) type)
    type)
@@ -849,7 +885,7 @@
  ; applying to arg with equivalent-but-not-identical type
  (check-equal?
   (judgment-holds
-   (type-of () () () ((A () ((λ ([x 2 (Array (S 2 3) Num)]) x)))
+   (type-of () () () ((A () ((λ ([x (Array (S 2 3) Num)]) x)))
                       (A (2) ((A (3) (1 2 3))
                               (A (3) (4 5 6)))))
             type)
@@ -859,12 +895,12 @@
  ; applying a nested array of functions
  (check-equal?
   (judgment-holds
-   (type-of [] [] [] ((A (3) [(A (2) [(λ ([x 0 (Array (S) Num)]) (A () (1)))
-                                      (λ ([x 0 (Array (S) Num)]) (A () (2)))])
-                              (A (2) [(λ ([x 0 (Array (S) Num)]) (A () (3)))
-                                      (λ ([x 0 (Array (S) Num)]) (A () (4)))])
-                              (A (2) [(λ ([x 0 (Array (S) Num)]) (A () (5)))
-                                      (λ ([x 0 (Array (S) Num)]) (A () (6)))])])
+   (type-of [] [] [] ((A (3) [(A (2) [(λ ([x (Array (S) Num)]) (A () (1)))
+                                      (λ ([x (Array (S) Num)]) (A () (2)))])
+                              (A (2) [(λ ([x (Array (S) Num)]) (A () (3)))
+                                      (λ ([x (Array (S) Num)]) (A () (4)))])
+                              (A (2) [(λ ([x (Array (S) Num)]) (A () (5)))
+                                      (λ ([x (Array (S) Num)]) (A () (6)))])])
                       (A (3) (7 23523 245)))
             type)
    type)
@@ -874,7 +910,7 @@
  (check-equal?
   (judgment-holds
    (type-of [] [] []
-            (Λ [elt] (A [] [(λ ([x 0 (Array (S) elt)]) x)]))
+            (Λ [elt] (A [] [(λ ([x (Array (S) elt)]) x)]))
             type) type)
   (term ((∀ [elt] (Array (S)
                          ((Array (S) elt) -> (Array (S) elt)))))))
@@ -882,7 +918,7 @@
  (check-equal?
   (judgment-holds
    (type-of [] [] []
-            (Λ [elt] (A [] [(λ ([x 0 (Array (S) foo)]) x)]))
+            (Λ [elt] (A [] [(λ ([x (Array (S) foo)]) x)]))
             type) type)
   '())
  
@@ -890,7 +926,7 @@
  (check-equal?
   (judgment-holds
    (type-of [] [] []
-            (TYPE (Λ [elt] (A [] [(λ ([x 0 (Array (S) elt)]) x)]))
+            (TYPE (Λ [elt] (A [] [(λ ([x (Array (S) elt)]) x)]))
                   Bool)
             type)
    type)
@@ -924,7 +960,7 @@
  (check-equal?
   (judgment-holds (type-of [][][]
                            (ל [(d Nat)]
-                              (A [] [(λ [(l 1 (Array (S d) Num))] l)]))
+                              (A [] [(λ [(l (Array (S d) Num))] l)]))
                            type) type)
   (term ((Π [(d Nat)]
             (Array (S)
@@ -959,6 +995,24 @@
   (term ((Σ [(d Nat)] (Array (S d) Num)))))
  ; (projection from a hand-made dependent sum is really a run-time issue)
  
+ ; typing compose makes use of typechecker code for handling abstracted indices
+ (check-equal?
+  (judgment-holds
+   (type-of [] [] []
+            (ל [(s1 Shape) (s2 Shape) (s3 Shape)]
+               (Λ [α β γ]
+                  (A []
+                     [(λ [(f (Array (S) ((Array s1 α) -> (Array s2 β))))
+                          (g (Array (S) ((Array s2 β) -> (Array s3 γ))))]
+                        (A [] [(λ [(x (Array s1 α))] (g (f x)))]))])))
+            type)
+   type)
+  (term ((Π [(s1 Shape) (s2 Shape) (s3 Shape)]
+            (∀ [α β γ]
+               (Array (S)
+                      ((Array (S) ((Array s1 α) -> (Array s2 β)))
+                       (Array (S) ((Array s2 β) -> (Array s3 γ)))
+                       -> (Array (S) ((Array s1 α) -> (Array s3 γ))))))))))
  
  ;-------------------
  ; type and index well-formedness
