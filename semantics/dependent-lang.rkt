@@ -2,26 +2,24 @@
 
 (require rackunit
          redex
-         "language.rkt"
-         "typed-lang.rkt")
+         "language.rkt")
 
 (define-extended-language Dependent Arrays
-  ; need to put dependent λ and syntax for Σ-related things somewhere
   ; may also want to add a type annotation to array syntax
   ; (A type (num ...) (el-expr ...)), etc.
   (expr ....
         ; type abstraction (or should this be at `fun' level?)
-        (Λ [var ...] expr)
+        (T-λ [var ...] expr)
         ; type application
-        (TYPE expr type ...)
+        (T-APP expr type ...)
         ; construction of dependent sum
         (SUM idx ... expr type)
         ; can only get the abstracted thing -- the witness is an index
         (Σ-PROJ expr)
         ; index abstraction
-        (ל [(var sort) ...] expr)
+        (I-λ [(var sort) ...] expr)
         ; index application
-        (INDEX expr idx ...))
+        (I-APP expr idx ...))
   
   ; for array syntax, already-present shape vector works as constructor index
   ; allow arrays of types and sorts? or are arrays strictly value-level?
@@ -33,8 +31,8 @@
   
   ; evaluation contexts -- need typed semantics to show type erasure "works"
   (E ....
-     (TYPE E type ...)
-     (INDEX E idx ...)
+     (T-APP E type ...)
+     (I-APP E idx ...)
      (Σ-PROJ E)
      (SUM idx ... E type))
   
@@ -88,7 +86,7 @@
 ; type check an expression (or single element expression) in the
 ; dependently-typed version of the language
 ; need a kind-env ::= (var ...), and have to check that type variables are bound
-; before they are used (they can appear in λ, Λ, ל, and TYPE forms)
+; before they are used (they can appear in λ, T-λ, I-λ, and T-APP forms)
 (define-judgment-form Dependent
   #:contract (type-of sort-env kind-env type-env el-expr type)
   #:mode (type-of I I I I O)
@@ -102,9 +100,9 @@
   ; variable: grab from environment (not there -> ill-typed)
   [; should probably change this to have premise which calls type env lookup
    --- variable
-   (type-of sort-env kind-env
-            ([var_0 type_0] ... [var_1 type_1] [var_2 type_2] ...)
-            var_1 type_1)]
+       (type-of sort-env kind-env
+                ([var_0 type_0] ... [var_1 type_1] [var_2 type_2] ...)
+                var_1 type_1)]
   ; primitive operator: call out to metafunction
   [(where type (primop-type op))
    --- operator
@@ -140,13 +138,13 @@
    (type-of sort-env kind-env type-env
             (expr_fun expr_arg ...)
             (canonicalize-type (in-hole frame-struct_max type_output)))]
-  ; type abstraction: 
+  ; type abstraction:
   [; here is where we need the kind-env (extend here, check in other rules)
    (type-of sort-env (kind-env-update [var ★] ... kind-env) type-env
             expr_body type)
    ---
    (type-of sort-env kind-env type-env
-            (Λ [var ...] expr_body) (∀ [var ...] type))]
+            (T-λ [var ...] expr_body) (∀ [var ...] type))]
   ; type application
   [(type-of sort-env kind-env type-env expr (∀ (var ...) type))
    (kind-of sort-env kind-env type-env type_arg) ...
@@ -155,7 +153,7 @@
    (side-condition (all-non-array type_arg ...))
    ---
    (type-of sort-env kind-env type-env
-            (TYPE expr type_arg ...)
+            (T-APP expr type_arg ...)
             (type/type-sub [(var type_arg) ...] type))]
   
   ; index abstraction: extend sort environment, make sure body has correct type
@@ -163,7 +161,7 @@
             kind-env type-env expr type)
    ---
    (type-of sort-env kind-env type-env
-            (ל [(var sort) ...] expr)
+            (I-λ [(var sort) ...] expr)
             (Π [(var sort) ...] type))]
   
   ; index app: check that indices have proper sort, substitute indices into type
@@ -172,7 +170,7 @@
    (sort-of sort-env kind-env type-env idx_prod Shape)
    (sort-of sort-env kind-env type-env idx_arg sort) ...
    --- idx-app
-   (type-of sort-env kind-env type-env (INDEX expr idx_arg ...)
+   (type-of sort-env kind-env type-env (I-APP expr idx_arg ...)
             (Array idx_prod (index/type-sub ([var idx_arg] ...) type)))]
   
   ; projection from dependent sum
@@ -464,19 +462,19 @@
    (λ [(var (index/type-sub idx-env type)) ...]
      (index/expr-sub idx-env expr))]
   [(index/expr-sub idx-env fun) fun]
-  [(index/expr-sub idx-env (Λ [var ...] expr))
-   (Λ [var ...] (index/expr-sub idx-env expr))]
-  [(index/expr-sub idx-env (ל [(var sort) ...] expr))
-   ; index vars are shadowed by the ל-binder
-   (ל [(var sort) ...] (index/expr-sub (shadow (var ...) idx-env) expr))]
+  [(index/expr-sub idx-env (T-λ [var ...] expr))
+   (T-λ [var ...] (index/expr-sub idx-env expr))]
+  [(index/expr-sub idx-env (I-λ [(var sort) ...] expr))
+   ; index vars are shadowed by the I-λ-binder
+   (I-λ [(var sort) ...] (index/expr-sub (shadow (var ...) idx-env) expr))]
   ; application forms
   [(index/expr-sub idx-env (expr_fun expr_arg ...))
    ((index/expr-sub idx-env expr_fun)
     (index/expr-sub idx-env expr_arg) ...)]
-  [(index/expr-sub idx-env (TYPE expr_fun type_arg ...))
+  [(index/expr-sub idx-env (T-APP expr_fun type_arg ...))
    ((index/expr-sub idx-env expr_fun)
     (index/type-sub idx-env type_arg) ...)]
-  [(index/expr-sub idx-env (INDEX expr_fun idx_arg ...))
+  [(index/expr-sub idx-env (I-APP expr_fun idx_arg ...))
    ((index/expr-sub idx-env expr_fun)
     (index/expr-sub idx-env idx_arg) ...)]
   ; dependent sums
@@ -535,20 +533,20 @@
    (λ [(var (type/type-sub type-env type)) ...]
      (type/expr-sub type-env expr))]
   [(type/expr-sub type-env fun) fun]
-  [(type/expr-sub type-env (Λ [var ...] expr))
+  [(type/expr-sub type-env (T-λ [var ...] expr))
    ; shadow type vars
-   (Λ [var ...] (type/expr-sub (shadow (var ...) type-env) expr))]
-  [(type/expr-sub type-env (ל [(var sort) ...] expr))
-   (ל [(var sort) ...] (type/expr-sub type-env expr))]
+   (T-λ [var ...] (type/expr-sub (shadow (var ...) type-env) expr))]
+  [(type/expr-sub type-env (I-λ [(var sort) ...] expr))
+   (I-λ [(var sort) ...] (type/expr-sub type-env expr))]
   ; application forms
   [(type/expr-sub type-env (expr_fun expr_arg ...))
    ((type/expr-sub type-env expr_fun)
     (type/expr-sub type-env expr_arg) ...)]
-  [(type/expr-sub type-env (TYPE expr type ...))
-   (TYPE (type/expr-sub type-env expr)
-         (type/type-sub type-env type) ...)]
-  [(type/expr-sub type-env (INDEX expr idx ...))
-   (INDEX (type/expr-sub type-env expr)
+  [(type/expr-sub type-env (T-APP expr type ...))
+   (T-APP (type/expr-sub type-env expr)
+          (type/type-sub type-env type) ...)]
+  [(type/expr-sub type-env (I-APP expr idx ...))
+   (I-APP (type/expr-sub type-env expr)
           (type/index-sub type-env idx) ...)]
   ; dependent sums
   [(type/expr-sub type-env (SUM idx ... expr type))
@@ -609,21 +607,21 @@
      (expr/expr-sub (shadow (var ...) expr-env) expr-body))]
   ; covers op and c-op
   [(expr/expr-sub expr-env fun) fun]
-  [(expr/expr-sub expr-env (Λ ([var] ...) expr_body))
+  [(expr/expr-sub expr-env (T-λ ([var] ...) expr_body))
    ; type variables do not shadow term variables (whether a variable represents
    ; a term, type, or index is evident from is position)
-   (Λ ([var] ...) (expr/expr-sub expr-env expr-body))]
-  [(expr/expr-sub expr-env (ל ([var sort] ...) expr_body))
+   (T-λ ([var] ...) (expr/expr-sub expr-env expr-body))]
+  [(expr/expr-sub expr-env (I-λ ([var sort] ...) expr_body))
    ; index variables do not shadow term variables
-   (ל ([var sort] ...) (expr/expr-sub expr-env expr-body))]
+   (I-λ ([var sort] ...) (expr/expr-sub expr-env expr-body))]
   ; application forms
   [(expr/expr-sub expr-env (expr_fun expr_arg ...))
    ((expr/expr-sub expr-env expr_fun) (expr/expr-sub expr-env expr_arg) ...)]
-  [(expr/expr-sub expr-env (TYPE expr_fun type_arg ...))
-   (TYPE (expr/expr-sub expr-env expr_fun)
-         (expr/type-sub expr-env type_arg) ...)]
-  [(expr/expr-sub expr-env (INDEX expr_fun idx_arg ...))
-   (INDEX (expr/expr-sub expr-env expr_fun)
+  [(expr/expr-sub expr-env (T-APP expr_fun type_arg ...))
+   (T-APP (expr/expr-sub expr-env expr_fun)
+          (expr/type-sub expr-env type_arg) ...)]
+  [(expr/expr-sub expr-env (I-APP expr_fun idx_arg ...))
+   (I-APP (expr/expr-sub expr-env expr_fun)
           (expr/idx-sub expr-env idx_arg) ...)]
   ; dependent sums
   [(expr/expr-sub expr-env (SUM idx ... expr type))
@@ -910,7 +908,7 @@
  (check-equal?
   (judgment-holds
    (type-of [] [] []
-            (Λ [elt] (A [] [(λ ([x (Array (S) elt)]) x)]))
+            (T-λ [elt] (A [] [(λ ([x (Array (S) elt)]) x)]))
             type) type)
   (term ((∀ [elt] (Array (S)
                          ((Array (S) elt) -> (Array (S) elt)))))))
@@ -918,7 +916,7 @@
  (check-equal?
   (judgment-holds
    (type-of [] [] []
-            (Λ [elt] (A [] [(λ ([x (Array (S) foo)]) x)]))
+            (T-λ [elt] (A [] [(λ ([x (Array (S) foo)]) x)]))
             type) type)
   '())
  
@@ -926,8 +924,8 @@
  (check-equal?
   (judgment-holds
    (type-of [] [] []
-            (TYPE (Λ [elt] (A [] [(λ ([x (Array (S) elt)]) x)]))
-                  Bool)
+            (T-APP (T-λ [elt] (A [] [(λ ([x (Array (S) elt)]) x)]))
+                   Bool)
             type)
    type)
   (term ((Array (S) ((Array (S) Bool) -> (Array (S) Bool))))))
@@ -939,28 +937,28 @@
   (judgment-holds
    (type-of [] [] [(op (Π ([d1 Nat]) ((Array (S d1) Num)
                                       -> (Array (S 1 d1) Num))))]
-            (INDEX (A () [op]) 3)
+            (I-APP (A () [op]) 3)
             type)
    type)
   (term ((Array (S) [(Array (S 3) Num) -> (Array (S 1 3) Num)]))))
  
  #;(check-equal?
-    (judgment-holds (type-of () () (INDEX + (S 3) (S)) type) type)
+    (judgment-holds (type-of () () (I-APP + (S 3) (S)) type) type)
     (term (((Array (S 3) Num)
             (Array (S) Num)
             -> (Array (frame [(S 3) 0] [(S) 0]) Num)))))
  
  ; index application followed by function application
  #;(check-equal?
-    (judgment-holds (type-of () () ((INDEX + (S 3) (S))
+    (judgment-holds (type-of () () ((I-APP + (S 3) (S))
                                     (A (3) (1 2 3)) (A () (10))) type) type)
     (term ((Array (frame [(S 3) 0] [(S) 0]) Num))))
  
  ; index abstraction
  (check-equal?
   (judgment-holds (type-of [][][]
-                           (ל [(d Nat)]
-                              (A [] [(λ [(l (Array (S d) Num))] l)]))
+                           (I-λ [(d Nat)]
+                                (A [] [(λ [(l (Array (S d) Num))] l)]))
                            type) type)
   (term ((Π [(d Nat)]
             (Array (S)
@@ -999,20 +997,49 @@
  (check-equal?
   (judgment-holds
    (type-of [] [] []
-            (ל [(s1 Shape) (s2 Shape) (s3 Shape)]
-               (Λ [α β γ]
-                  (A []
-                     [(λ [(f (Array (S) ((Array s1 α) -> (Array s2 β))))
-                          (g (Array (S) ((Array s2 β) -> (Array s3 γ))))]
-                        (A [] [(λ [(x (Array s1 α))] (g (f x)))]))])))
-            type)
-   type)
+            (I-λ [(s1 Shape) (s2 Shape) (s3 Shape)]
+                 (T-λ [α β γ]
+                      (A [] [(λ [(f (Array (S) ((Array s1 α) -> (Array s2 β))))
+                                 (g (Array (S) ((Array s2 β) -> (Array s3 γ))))]
+                               (A [] [(λ [(x (Array s1 α))] (g (f x)))]))])))
+            type) type)
   (term ((Π [(s1 Shape) (s2 Shape) (s3 Shape)]
             (∀ [α β γ]
                (Array (S)
                       ((Array (S) ((Array s1 α) -> (Array s2 β)))
                        (Array (S) ((Array s2 β) -> (Array s3 γ)))
                        -> (Array (S) ((Array s1 α) -> (Array s3 γ))))))))))
+ 
+ ; so does typing a fork composition
+ (check-equal?
+  (judgment-holds
+   (type-of
+    [] [] []
+    (I-λ [(s-li Shape) (s-lo Shape) (s-ri Shape) (s-ro Shape) (s-jo Shape)]
+         (T-λ [t-li t-lo t-ri t-ro t-jo]
+              (A [] [(λ ([f-l (Array (S) ((Array s-li t-li)
+                                          -> (Array s-lo t-lo)))]
+                         [f-r (Array (S) ((Array s-ri t-ri)
+                                          -> (Array s-ro t-ro)))]
+                         [f-j (Array (S) ((Array s-lo t-lo)
+                                          (Array s-ro t-ro)
+                                          -> (Array s-jo t-jo)))])
+                       (A [] [(λ [(x (Array s-li t-li))
+                                  (y (Array s-ri t-ri))]
+                                (f-j (f-l x) (f-r y)))]))])))
+    type) type)
+  (term ((Π [(s-li Shape) (s-lo Shape) (s-ri Shape) (s-ro Shape) (s-jo Shape)]
+            (∀ [t-li t-lo t-ri t-ro t-jo]
+               (Array (S) ((Array (S) ((Array s-li t-li)
+                                       -> (Array s-lo t-lo)))
+                           (Array (S) ((Array s-ri t-ri)
+                                       -> (Array s-ro t-ro)))
+                           (Array (S) ((Array s-lo t-lo)
+                                       (Array s-ro t-ro)
+                                       -> (Array s-jo t-jo)))
+                           -> (Array (S) ((Array s-li t-li)
+                                          (Array s-ri t-ri)
+                                          -> (Array s-jo t-jo))))))))))
  
  ;-------------------
  ; type and index well-formedness
