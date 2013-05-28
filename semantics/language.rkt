@@ -24,8 +24,7 @@
   
   ; functions may be builtin or user-defined
   (fun (λ [(var num) ...] expr)
-       op
-       c-op)
+       op)
   ; builtin operators
   (op + - * /
       < > <= >= =
@@ -34,12 +33,11 @@
       append itemize
       shape-of reshape transpose
       nub-sieve
-      head behead tail curtail)
-  ; curried builtins
-  ; TODO: maybe curried builtins are bad idea: provide λ-wrapped primop instead
-  (c-op reduce
-        fold/l
-        fold/r)
+      head behead tail curtail
+      iota
+      reduce
+      fold/r
+      fold/l)
   
   ; syntax for writing arrays
   (arr (A (num ...) (el-expr ...))) ; flat representation, shape and values
@@ -63,15 +61,15 @@
   (reduction-relation
    Arrays
    #:domain expr
-   [--> (in-hole E (((A () (reduce)) arr/f) arr/v))
-        (in-hole E (tree-apply arr/f (arr/v_cell ...)))
+   [--> (in-hole E ((A () (reduce)) arr/f arr/v_base arr/v))
+        (in-hole E (tree-apply arr/f arr/v_base (arr/v_cell ...)))
         (where (arr/v_cell ...) (cells/rank -1 arr/v))
         reduce]
-   [--> (in-hole E (((A () (fold/r)) arr/f arr/v_0) arr/v_1))
+   [--> (in-hole E ((A () (fold/r)) arr/f arr/v_0 arr/v_1))
         (in-hole E (chain-apply/r arr/f (arr/v_cell ... arr/v_0)))
         (where (arr/v_cell ...) (cells/rank -1 arr/v_1))
         fold/r]
-   [--> (in-hole E (((A () (fold/l)) arr/f arr/v_0) arr/v_1))
+   [--> (in-hole E ((A () (fold/l)) arr/f arr/v_0 arr/v_1))
         (in-hole E (chain-apply/l arr/f (arr/v_0 arr/v_cell ...)))
         (where (arr/v_cell ...) (cells/rank -1 arr/v_1))
         fold/l]
@@ -208,13 +206,14 @@
    (arr/f (chain-apply/l arr/f (arr_0 ...)) arr_1)])
 ;; similar to chain-apply but for tree-shaped application to the arrays
 (define-metafunction Arrays
-  tree-apply : arr/f (arr ...) -> any
-  [(tree-apply arr/f (arr)) arr]
-  [(tree-apply arr/f (arr_0 arr_1)) (arr/f arr_0 arr_1)]
-  [(tree-apply arr/f (arr ...))
+  tree-apply : arr/f arr (arr ...) -> any
+  [(tree-apply arr/f arr_base ()) arr_base]
+  [(tree-apply arr/f arr_base (arr)) arr]
+  [(tree-apply arr/f arr_base (arr_0 arr_1)) (arr/f arr_0 arr_1)]
+  [(tree-apply arr/f arr_base (arr ...))
    #;((arr_0 ...) || (arr_1 ...))
-   (arr/f (tree-apply arr/f (arr_0 ...))
-        (tree-apply arr/f (arr_1 ...)))
+   (arr/f (tree-apply arr/f arr_base (arr_0 ...))
+          (tree-apply arr/f arr_base (arr_1 ...)))
    (where num_length (length/m (arr ...)))
    (where (arr_0 ...) (take/m (arr ...) ,(quotient (term num_length) 2)))
    (where (arr_1 ...) (drop/m (arr ...) ,(quotient (term num_length) 2)))])
@@ -319,7 +318,16 @@
   [(apply-op log ((A () (num))))
    (A () (,(log (term num))))]
   [(apply-op append (arr_1 arr_2))
-   (op/append arr_1 arr_2)])
+   (op/append arr_1 arr_2)]
+  [(apply-op iota ((A (num_dim) (num_elt ...))))
+   (box (A (num_elt ...) ,(for/list [(n (foldr * 1 (term (num_elt ...))))] n)))
+   (where (natural ...) (num_elt ... ))]
+  [(apply-op reduce arr_fun arr_base arr_arg)
+   (tree-apply arr_fun arr_base (arr_cell ...))
+   (where (arr_cell ...) (cells/rank -1 arr_arg))]
+  #;[(apply-op reshape arr_newshape arr_elts)
+   (op/reshape arr_newshape arr_elts)]
+  )
 
 ;; extract or look up ranks of a function
 (define-metafunction Arrays
@@ -347,13 +355,16 @@
   [(fun-rank behead) (+inf.0)]
   [(fun-rank tail) (+inf.0)]
   [(fun-rank curtail) (+inf.0)]
+  [(fun-rank iota) (1)]
   [(fun-rank (λ [(var num) ...] expr)) (num ...)]
-  [(fun-rank reduce) (+inf.0)]
-  [(fun-rank (reduce expr)) (+inf.0)]
-  [(fun-rank fold/r) (+inf.0 +inf.0)]
-  [(fun-rank (fold/r expr)) (+inf.0)]
-  [(fun-rank fold/l) (+inf.0 +inf.0)]
-  [(fun-rank (fold/l expr)) (+inf.0)])
+  ;[(fun-rank reduce) (+inf.0)]
+  [(fun-rank reduce) (+inf.0 +inf.0 +inf.0)]
+  ;[(fun-rank (reduce expr)) (+inf.0)]
+  [(fun-rank fold/r) (+inf.0 +inf.0 +inf.0)]
+  ;[(fun-rank (fold/r expr)) (+inf.0)]
+  [(fun-rank fold/l) (+inf.0 +inf.0 +inf.0)]
+  ;[(fun-rank (fold/l expr)) (+inf.0)]
+  )
 
 
 ;;; metafunctions for handling primitive operations that process arrays
@@ -801,7 +812,8 @@
  (check-equal?
   (apply-reduction-relation*
    ->Array
-   (term (((scalar reduce) (scalar +))
+   (term ((scalar reduce)
+          (scalar +) (A [3] [0 0 0])
           (A (3 3) (1 2 3
                     4 5 6
                     7 8 9)))))
@@ -810,23 +822,16 @@
  (check-equal?
   (apply-reduction-relation*
    ->Array
-   (term ((sλ ([x 1]) (((scalar reduce) (scalar +)) x))
-          (A (3 3) (1 2 3
-                    4 5 6
-                    7 8 9)))))
-  (term ((A (3) (6 15 24)))))
- 
- (check-equal?
-  (apply-reduction-relation*
-   ->Array
-   (term (((scalar fold/r) (scalar -) (scalar 0))
+   (term ((scalar fold/r)
+          (scalar -) (scalar 0)
           (A (4) (1 1 1 1)))))
   (term ((A () (0)))))
  
  (check-equal?
   (apply-reduction-relation*
    ->Array
-   (term (((scalar fold/l) (scalar -) (scalar 0))
+   (term ((scalar fold/l)
+          (scalar -) (scalar 0)
           (A (4) (1 1 1 1)))))
   (term ((A () (-4)))))
  
