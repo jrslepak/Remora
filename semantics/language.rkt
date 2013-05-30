@@ -1,7 +1,5 @@
 #lang racket
 
-; TODO: boxes (e.g. for type-erasing array of dependent sums)
-
 (require rackunit
          redex)
 (provide Arrays
@@ -10,8 +8,8 @@
 
 (define-language Arrays
   (expr (expr expr ...)
-          arr
-          var)
+        arr
+        var)
   (el-expr expr elt)
   
   ; array elements: base data and functions
@@ -40,12 +38,19 @@
       fold/l)
   
   ; syntax for writing arrays
-  (arr (A (num ...) (el-expr ...))) ; flat representation, shape and values
+  (arr (A (num ...) (el-expr ...)) ; flat representation, shape and values
+       (box expr))
   (arr/pv (A (num ...) (elt ...))) ; pseudo-value form -- no app forms inside
   (pseudo-elt arr/pv arr/v base)
-  (arr/v arr/b arr/f) ; value form -- only base data or functions inside
+  ; value form -- only base data or functions inside
+  (arr/v arr/b arr/f arr/box box-val)
   (arr/b (A (num ...) (base ...)))
   (arr/f (A (num ...) (fun ...)))
+  ; have to exclude scalar array containing box
+  ; (it should be reduced to just the box)
+  (arr/box (A (num num ...) (box-val ...)) ; nonscalar
+           (A (num ...) (box-val box-val box-val ...))) ; multiple boxes
+  (box-val (box arr/v))
   
   ; variables
   (var variable-not-otherwise-mentioned)
@@ -54,7 +59,8 @@
   (E hole
      (E expr ...)
      (arr/v ... E expr ...)
-     (A (num ...) (arr/v ... E el-expr ...))))
+     (A (num ...) (arr/v ... E el-expr ...))
+     (box E)))
 
 
 (define ->Array
@@ -97,19 +103,25 @@
         shape-of]
    [--> (in-hole E ((A () (reshape)) arr/v_0 arr/v_1))
         (in-hole E (op/reshape arr/v_0 arr/v_1))
+        (side-condition (= 1 (term (rank arr/v_0))))
         reshape]
-   [--> (in-hole E ((A () (op)) arr ...))
-        (in-hole E (apply-op op (arr ...)))
+   [--> (in-hole E ((A () (op)) arr/v ...))
+        (in-hole E (apply-op op (arr/v ...)))
         (side-condition (equal? (term (fun-rank op))
-                                (term  ((rank arr) ...))))
+                                (term  ((rank arr/v) ...))))
         op]
-   [--> (in-hole E ((A () ((λ [(var num) ...] expr))) arr/v ...))
+   [--> (in-hole E ((A () ((λ [(var natural) ...] expr))) arr/v ...))
         (in-hole E (subst [(var arr/v) ...] expr))
-        (side-condition (term (all ((at-rank? num arr/v) ...))))
+        
+        (side-condition (term (all ((at-rank? natural arr/v) ...))))
         apply]
+   [--> (in-hole E ((A [num_fundim] []) arr/v ...))
+        (in-hole E (A [num_fundim] []))
+        ; handling empty array of functions (may have some issues typing this)
+        arr/f-empty]
    [--> (in-hole E (arr/f arr/v ...))
         (in-hole E
-                 (A (shape arr/f) (((scalar fun) arr/v_cell ...) ...)))
+                 (A (shape arr/f) (((scalar fun) arr_cell ...) ...)))
         ; require a nonempty array of functions
         (where (A (num_fundim ...) (fun_0 fun_1 ...)) arr/f)
         ; all functions in array must have same expected ranks
@@ -128,17 +140,26 @@
                                     (overrank? natural_funrank arr/v) ...))))
         
         (where ((A () (fun)) ...) (cells/rank 0 arr/f))
-        (where ((arr/v_cell ...) ...)
+        (where ((arr_cell ...) ...)
                (transpose ((cells/rank natural_funrank arr/v) ...)))
         arr/f-map]
    [--> (in-hole E (arr/f arr/v ...))
         (in-hole E (arr/f_natrank arr/v ...))
         (where (A (num_dim ...) (fun ...)) arr/f)
-        
+        ; don't naturalize if function array elts are already natural-ranked
         (side-condition (not (redex-match Arrays ((natural ...) ...)
                                           (term ((fun-rank fun) ...)))))
-        (where (fun_natrank ...) ((naturalize-rank fun arr/v ...) ...))
-        (where arr/f_natrank (A (num_dim ...) (fun_natrank ...)))
+        (where (fun_natrank0 fun_natrank1 ...)
+               ((naturalize-rank fun arr/v ...) ...))
+        (where arr/f_natrank (A (num_dim ...) (fun_natrank0 fun_natrank1 ...)))
+        ; don't naturalize a scalar containing a builtin where there are no
+        ; overranked args
+        ; TODO: explain in paper why naturalize builtins -- non-scalar arrays
+        ;       of builtins need to be naturalized  to set up for lifting
+        (side-condition (or (not (redex-match Arrays (A [] [op]) (term arr/f)))
+                            (for/or [(x (term (fun-rank fun_natrank0)))
+                                     (v (term (arr/v ...)))]
+                              (term (overrank? ,x ,v)))))
         arr/f-naturalize]
    [--> (in-hole E (arr/f arr/v ...))
         (in-hole E (arr/f_lifted arr/v_lifted ...))
@@ -175,7 +196,11 @@
         ; all cells must have the same shape
         (where (num_cell-dim ...) (shape-of-all arr/pv ...))
         (where ((A (num ...) (fun ...)) ...) (arr/pv ...))
-        collapse2]))
+        collapse2]
+   [--> (in-hole E (A [] [box-val]))
+        (in-hole E box-val)
+        box-collapse]
+   ))
 
 
 
@@ -236,6 +261,14 @@
   [(naturalize-rank (λ [(var num) ...] expr) arr ...)
    (λ [(var natural) ...] expr)
    (where (natural ...) ((natural-cell-rank num arr) ...))]
+  [(naturalize-rank op arr ...)
+   (λ [(var natural) ...] ((scalar op) var ...))
+   (where (num ...) (fun-rank op))
+   (side-condition (for/or [(r (term (num ...)))]
+                     (not (exact-nonnegative-integer? r))))
+   (where (var ...) ,(for/list [(x (length (term (num ...))))]
+                       (gensym)))
+   (where (natural ...) ((natural-cell-rank num arr) ...))]
   [(naturalize-rank fun arr ...) #f])
 (define-metafunction Arrays
   natural-cell-rank : num arr -> num
@@ -251,7 +284,7 @@
   [(shape-of-all arr_0 arr_1 ...)
    (shape arr_0)
    (side-condition (equal? (term (shape arr_0))
-                          (term (shape-of-all arr_1 ...))))]
+                           (term (shape-of-all arr_1 ...))))]
   [(shape-of-all arr ...) #f])
 
 ;; map a function over the cells of its arguments
@@ -275,7 +308,7 @@
    (side-condition (term (all-equal? ((num_frame-dim ...) ...))))]
   ; did not meet conditions for mapping -> return #f
   [(array-map fun (arr_arg ...)) #f])
-  
+
 ;; set up function application for each cell group (1st cells, 2nd cells, etc.)
 (define-metafunction Arrays
   cell-apply : fun ((arr ...) ...) -> ((fun arr ...) ...)
@@ -326,7 +359,7 @@
    (tree-apply arr_fun arr_base (arr_cell ...))
    (where (arr_cell ...) (cells/rank -1 arr_arg))]
   #;[(apply-op reshape arr_newshape arr_elts)
-   (op/reshape arr_newshape arr_elts)]
+     (op/reshape arr_newshape arr_elts)]
   )
 
 ;; extract or look up ranks of a function
@@ -384,9 +417,9 @@
   op/reshape : arr arr -> arr
   [(op/reshape (A (num) (num_new-dim ...))
                (A (num_old-dim ...) (el-expr ...)))
-   (A (num_new-dim ...)
-      ,(for/list ([i (term num_new-size)])
-         (list-ref (term (el-expr ...)) (modulo i (term num_old-size)))))
+   (box (A (num_new-dim ...)
+           ,(for/list ([i (term num_new-size)])
+              (list-ref (term (el-expr ...)) (modulo i (term num_old-size))))))
    (where num_new-size ,(foldr * 1 (term (num_new-dim ...))))
    (where num_old-size ,(foldr * 1 (term (num_old-dim ...))))])
 (define-metafunction Arrays
@@ -438,30 +471,30 @@
   [(op/tail (A (num_len num_dim ...) (el-expr_val ...)))
    (A (num_dim ...)
       (take-right/m (el-expr_val ...)
-              ,(foldr * 1 (term (num_dim ...)))))])
+                    ,(foldr * 1 (term (num_dim ...)))))])
 (define-metafunction Arrays
   op/curtail : arr -> arr
   [(op/curtail (A (num_len num_dim ...) (el-expr_val ...)))
    (A (,(sub1 (term num_len)) num_dim ...)
       (drop-right/m (el-expr_val ...)
-              ,(foldr * 1 (term (num_dim ...)))))])
+                    ,(foldr * 1 (term (num_dim ...)))))])
 
 ;; utility functions for builtin operators
 ; convert dimensions to the offset associated with each dimensions
 (define (shape->offsets shape)
-    (for/fold
-        ([offlist '(1)]) ([x (in-range (sub1 (length shape)) 0 -1)])
-      (cons (* (first offlist) (list-ref shape x)) offlist)))
+  (for/fold
+      ([offlist '(1)]) ([x (in-range (sub1 (length shape)) 0 -1)])
+    (cons (* (first offlist) (list-ref shape x)) offlist)))
 ; convert direct index into value part of array to an index based on the shape
 (define (flat->deep shape flat-idx)
-    (define offsets (shape->offsets shape))
-    (define-values (leftover backwards-index)
-      (for/fold ([fmod flat-idx]
-                 [deep-idx '()])
-        ([off offsets])
-        (values (remainder fmod off)
-                (cons (floor (/ fmod off)) deep-idx))))
-    (reverse backwards-index))
+  (define offsets (shape->offsets shape))
+  (define-values (leftover backwards-index)
+    (for/fold ([fmod flat-idx]
+               [deep-idx '()])
+      ([off offsets])
+      (values (remainder fmod off)
+              (cons (floor (/ fmod off)) deep-idx))))
+  (reverse backwards-index))
 ; convert an index based on the shape to direct index into value part of array
 (define (deep->flat shape idxs)
   (cond [(equal? #() shape) 0]
@@ -487,7 +520,8 @@
   subst : [(var expr) ...] el-expr -> el-expr
   [(subst [(var expr) ...] base) base]
   [(subst [(var expr) ...] op) op]
-  [(subst [(var expr) ...] c-op) c-op]
+  [(subst [(var expr) ...] (box expr_c))
+   (box (subst [(var expr) ...] expr_c))]
   [(subst [(var expr) ...] (A (num_sh ...) (el-expr_val ...)))
    (A (num_sh ...) ((subst [(var expr) ...] el-expr_val) ...))]
   [(subst [(var expr) ...] (op expr_arg ...))
@@ -566,12 +600,14 @@
 (define-metafunction Arrays
   rank : arr -> num
   [(rank (A (num ...) (el-expr ...)))
-   ,(length (term (num ...)))])
+   ,(length (term (num ...)))]
+  [(rank (box expr)) 0])
 
 ;; extract shape of array
 (define-metafunction Arrays
   shape : arr -> (num ...)
-  [(shape (A (num ...) (el-expr ...))) (num ...)])
+  [(shape (A (num ...) (el-expr ...))) (num ...)]
+  [(shape (box expr)) ()])
 
 ;; extract value of array
 (define-metafunction Arrays
@@ -656,8 +692,8 @@
    ,(cons (term (A (num_cell-dim ...) (take/m (el-expr ...) num_cellsize)))
           ; drop one cell's elements from array, and split remaining elements
           (term (cells/shape (num_cell-dim ...)
-                       (A (num_arr-dim ...)
-                          (drop/m (el-expr ...) num_cellsize)))))
+                             (A (num_arr-dim ...)
+                                (drop/m (el-expr ...) num_cellsize)))))
    (where num_cellsize ,(foldr * 1 (term (num_cell-dim ...))))])
 (define-metafunction Arrays
   ; cell rank, array
@@ -779,34 +815,34 @@
   (apply-reduction-relation*
    ->Array
    (term ((scalar +) (A (3 3) (1 2 3
-                      4 5 6
-                      7 8 9))
-            (A (3) (10 20 30)))))
+                                 4 5 6
+                                 7 8 9))
+                     (A (3) (10 20 30)))))
   (term ((A (3 3) (11 12 13
-                   24 25 26
-                   37 38 39)))))
+                      24 25 26
+                      37 38 39)))))
  
  (check-equal?
   (apply-reduction-relation*
    ->Array
    (term ((sλ ([x 1][y 1]) ((scalar +) x y)) (A (3 3) (1 2 3
-                                                       4 5 6
-                                                       7 8 9))
-                                   (A (3) (10 20 30)))))
+                                                         4 5 6
+                                                         7 8 9))
+                                             (A (3) (10 20 30)))))
   (term ((A (3 3) (11 22 33
-                   14 25 36
-                   17 28 39)))))
+                      14 25 36
+                      17 28 39)))))
  
  (check-equal?
   (apply-reduction-relation*
    ->Array
    (term ((sλ ([x -1][y 1]) ((scalar +) x y)) (A (3 3) (1 2 3
-                                                        4 5 6
-                                                        7 8 9))
-                                    (A (3) (10 20 30)))))
+                                                          4 5 6
+                                                          7 8 9))
+                                              (A (3) (10 20 30)))))
   (term ((A (3 3) (11 22 33
-                   14 25 36
-                   17 28 39)))))
+                      14 25 36
+                      17 28 39)))))
  
  ; reducing/folding along different axes/directions
  (check-equal?
@@ -815,8 +851,8 @@
    (term ((scalar reduce)
           (scalar +) (A [3] [0 0 0])
           (A (3 3) (1 2 3
-                    4 5 6
-                    7 8 9)))))
+                      4 5 6
+                      7 8 9)))))
   (term ((A (3) (12 15 18)))))
  
  (check-equal?
@@ -898,10 +934,6 @@
    ->Array
    (term ((scalar curtail) (A (4 2) (3 6 5 9 7 1 0 8)))))
   (term ((A (3 2) (3 6 5 9 7 1)))))
- ; take/l
- ; drop/l
- ; take/r
- ; drop/l
  ; shape-of
  (check-equal?
   (apply-reduction-relation*
@@ -913,18 +945,34 @@
   (apply-reduction-relation*
    ->Array
    (term ((scalar reshape) (A (2) (2 3)) (A (3 4) (2 9 4 3 5 2 7 4 2 1 0 9)))))
-  (term ((A (2 3) (2 9 4 3 5 2)))))
+  (term ((box (A (2 3) (2 9 4 3 5 2))))))
  (check-equal?
   (apply-reduction-relation*
    ->Array
    (term ((scalar reshape) (A (2) (3 3)) (A (4) (2 9 4 3)))))
-  (term ((A (3 3) (2 9 4 3 2 9 4 3 2)))))
- ; ravel
+  (term ((box (A (3 3) (2 9 4 3 2 9 4 3 2))))))
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ((scalar reshape) (A (2 2) (3 3 4 2)) (A (4) (2 9 4 3)))))
+  (term ((A [2] [(box (A (3 3) (2 9 4 3 2 9 4 3 2)))
+                 (box (A (4 2) (2 9 4 3 2 9 4 3)))]))))
  ; nub-sieve
  (check-equal?
   (term (op/nub-sieve (A (3 4) (2 9 4 3 5 2 7 4 2 1 0 9))))
   (term (A (3 4) (#t #t #t #t #t #f #t #f #f #t #t #f))))
- ; filter
+ ; iota
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ((scalar iota) (A (3) (2 1 3)))))
+  (term ((box (A (2 1 3) (0 1 2 3 4 5))))))
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ((scalar iota) (A (2 2) (2 1 4 3)))))
+  (term ((A (2) ((box (A (2 1) (0 1)))
+                 (box (A (4 3) (0 1 2 3 4 5 6 7 8 9 10 11))))))))
  
  
  ; some terms which should not be reducible (due to shape mismatch)
@@ -939,7 +987,7 @@
   (apply-reduction-relation
    ->Array
    (term ((scalar +) (A (2 3) (1 2 3
-                               4 5 6))
+                                 4 5 6))
                      (A (3) (10 20 30)))))
   '())
  
@@ -967,13 +1015,13 @@
    ->Array
    (term (((sλ ([x 0]) (sλ ([y 0]) ((scalar +) x y)))
            (A (2 2) (1 2
-                     3 4)))
+                       3 4)))
           (A (2) (10 20)))))
   (apply-reduction-relation*
    ->Array
    (term ((sλ ([x 0] [y 0]) ((scalar +) x y))
           (A (2 2) (1 2
-                    3 4))
+                      3 4))
           (A (2) (10 20))))))
  
  ; check that arrays of functions with non-natural rank get applied properly
@@ -984,7 +1032,7 @@
                   (λ ([x +inf.0]) ((scalar -) x (scalar 5)))))
           (A (4) (1 2 3 4)))))
   (term ((A (2 4) (10 20 30 40
-                   -4 -3 -2 -1)))))
+                      -4 -3 -2 -1)))))
  
  ; currying with non-natural rank
  (check-equal?
@@ -1057,4 +1105,66 @@
    ->Array
    (term ((sλ ([x +inf.0][y +inf.0]) ((scalar +) x y))
           (A (2) (1 2))
-          (A (2 2) (10 20 30 40)))))))
+          (A (2 2) (10 20 30 40))))))
+ 
+ ; make sure naturalization works on builtin ops too
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ((A [2] [append append])
+          (A [4] [2 3 4 5])
+          (A [4] [1 10 100 1000]))))
+  (term ((A [2 8] [2 3 4 5 1 10 100 1000 2 3 4 5 1 10 100 1000]))))
+ 
+ 
+ ; reducing within a box
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (box ([scalar +] (A [3] [9 8 7]) [scalar 4]))))
+  (term ((box (A [3] [13 12 11])))))
+ 
+ ; η-expanded box
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ([scalar (λ [(x 0)] (box x))] ([scalar +] [scalar 3] [scalar 4]))))
+  (term ((box [scalar 7]))))
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ([scalar (λ [(x 1)] (box x))]
+          ([scalar +] (A [3] [9 8 7]) [scalar 4]))))
+  (term ((box (A [3] [13 12 11])))))
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ([scalar (λ [(x +inf.0)] (box x))]
+          ([scalar +] (A [3] [9 8 7]) [scalar 4]))))
+  (term ((box (A [3] [13 12 11])))))
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ([scalar (λ [(x 0)] (box x))]
+          ([scalar +] (A [3] [9 8 7]) [scalar 4]))))
+  (term ((A [3] [(box [scalar 13]) (box [scalar 12]) (box [scalar 11])]))))
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ([scalar (λ [(x -1)] (box x))]
+          ([scalar +] (A [3] [9 8 7]) [scalar 4]))))
+  (term ((A [3] [(box [scalar 13]) (box [scalar 12]) (box [scalar 11])]))))
+ 
+ ; compose
+ (define Array-compose
+   (term (λ [(f +inf.0) (g +inf.0)]
+           [scalar (λ [(x +inf.0)] (f (g x)))])))
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term (([scalar (λ [(f +inf.0) (g +inf.0)]
+                     [scalar (λ [(x +inf.0)] (f (g x)))])]
+           [scalar (λ [(n 0)] ([scalar +] [scalar 1] n))]
+           [scalar (λ [(n 0)] ([scalar *] [scalar 2] n))])
+          [scalar 4])))
+  (term ([scalar 9]))))
