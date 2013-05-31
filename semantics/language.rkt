@@ -9,7 +9,8 @@
 (define-language Arrays
   (expr (expr expr ...)
         arr
-        var)
+        var
+        (unbox var ⇐ expr expr))
   (el-expr expr elt)
   
   ; array elements: base data and functions
@@ -60,7 +61,8 @@
      (E expr ...)
      (arr/v ... E expr ...)
      (A (num ...) (arr/v ... E el-expr ...))
-     (box E)))
+     (box E)
+     (unbox var ⇐ E expr)))
 
 
 (define ->Array
@@ -200,7 +202,9 @@
    [--> (in-hole E (A [] [box-val]))
         (in-hole E box-val)
         box-collapse]
-   ))
+   [--> (in-hole E (unbox var ⇐ (box arr/v) expr))
+        (in-hole E (subst [(var arr/v)] expr))
+        unbox]))
 
 
 
@@ -532,7 +536,10 @@
   [(subst [(var_0 expr_0) ...] var_1) var_1]
   [(subst [(var_sub expr_sub) ...] (λ [(var_arg num_arg) ...] expr_body))
    (λ [(var_arg num_arg) ...]
-     (subst (shadow [(var_sub expr_sub) ...] (var_arg ...)) expr_body))])
+     (subst (shadow [(var_sub expr_sub) ...] (var_arg ...)) expr_body))]
+  [(subst [(var_sub expr_sub) ...] (unbox var_box ⇐ expr_box expr_body))
+   (unbox var_box ⇐ (subst [(var_sub expr_sub) ...] expr_box)
+          (subst (shadow [(var_sub expr_sub) ...] (var_box)) expr_body))])
 
 ;; eliminate some variables from a substitution list
 (define-metafunction Arrays
@@ -1167,4 +1174,17 @@
            [scalar (λ [(n 0)] ([scalar +] [scalar 1] n))]
            [scalar (λ [(n 0)] ([scalar *] [scalar 2] n))])
           [scalar 4])))
-  (term ([scalar 9]))))
+  (term ([scalar 9])))
+ 
+ 
+ ; factorial
+ (define Array-fact
+   (term (λ [(n 0)]
+           (unbox x ⇐ ([scalar iota] (A [1] [n]))
+                  ([scalar reduce] [scalar *] [scalar 1]
+                                   ([scalar +] [scalar 1] x))))))
+ (check-equal?
+  (apply-reduction-relation*
+   ->Array
+   (term ([scalar ,Array-fact] (A [4] [0 1 3 5]))))
+  (term ((A [4] [1 1 6 120])))))
