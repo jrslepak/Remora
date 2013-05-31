@@ -40,17 +40,22 @@
   ; syntax for writing arrays
   (arr (A (num ...) (el-expr ...)) ; flat representation, shape and values
        (box expr))
+  
+  ; value forms
+  (val elt
+       (A (num ...) (elt ...))
+       (box val)
+       (A (num num ...) ((box val) ...)))
+  
+  ; specific forms of arrays (shorthand for use in specific situations)
   (arr/pv (A (num ...) (elt ...))) ; pseudo-value form -- no app forms inside
   (pseudo-elt arr/pv arr/v base)
-  ; value form -- only base data or functions inside
+  ; arrays which are values
   (arr/v arr/b arr/f arr/box box-val)
   (arr/b (A (num ...) (base ...)))
   (arr/f (A (num ...) (fun ...)))
-  ; have to exclude scalar array containing box
-  ; (it should be reduced to just the box)
-  (arr/box (A (num num ...) (box-val ...)) ; nonscalar
-           (A (num ...) (box-val box-val box-val ...))) ; multiple boxes
-  (box-val (box arr/v))
+  (arr/box (A (num num ...) (box-val ...))) ; nonscalar array of boxes
+  (box-val (box arr/v)) ; boxes which are values
   
   ; variables
   (var variable-not-otherwise-mentioned)
@@ -58,8 +63,8 @@
   ; evaluation contexts
   (E hole
      (E expr ...)
-     (arr/v ... E expr ...)
-     (A (num ...) (arr/v ... E el-expr ...))
+     (val ... E expr ...)
+     (A (num ...) (val ... E el-expr ...))
      (box E)
      (unbox var ⇐ E expr)))
 
@@ -68,6 +73,7 @@
   (reduction-relation
    Arrays
    #:domain expr
+   ; TODO: handle these with "op" rule
    [--> (in-hole E ((A () (reduce)) arr/f arr/v_base arr/v))
         (in-hole E (tree-apply arr/f arr/v_base (arr/v_cell ...)))
         (where (arr/v_cell ...) (cells/rank -1 arr/v))
@@ -106,21 +112,21 @@
         (in-hole E (op/reshape arr/v_0 arr/v_1))
         (side-condition (= 1 (term (rank arr/v_0))))
         reshape]
-   [--> (in-hole E ((A () (op)) arr/v ...))
-        (in-hole E (apply-op op (arr/v ...)))
+   [--> (in-hole E ((A () (op)) val ...))
+        (in-hole E (apply-op op (val ...)))
         (side-condition (equal? (term (fun-rank op))
-                                (term  ((rank arr/v) ...))))
+                                (term  ((rank val) ...))))
         op]
-   [--> (in-hole E ((A () ((λ [(var natural) ...] expr))) arr/v ...))
-        (in-hole E (subst [(var arr/v) ...] expr))
+   [--> (in-hole E ((A () ((λ [(var natural) ...] expr))) val ...))
+        (in-hole E (subst [(var val) ...] expr))
         
-        (side-condition (term (all ((at-rank? natural arr/v) ...))))
+        (side-condition (term (all ((at-rank? natural val) ...))))
         apply]
-   [--> (in-hole E ((A [num_fundim] []) arr/v ...))
+   [--> (in-hole E ((A [num_fundim] []) val ...))
         (in-hole E (A [num_fundim] []))
         ; handling empty array of functions (may have some issues typing this)
         arr/f-empty]
-   [--> (in-hole E (arr/f arr/v ...))
+   [--> (in-hole E (arr/f val ...))
         (in-hole E
                  (A (shape arr/f) (((scalar fun) arr_cell ...) ...)))
         ; require a nonempty array of functions
@@ -136,22 +142,22 @@
                (fun-rank fun_0))
         ; ensure they are all overranked by the same amount
         (side-condition (term (same-overrank?
-                               [(0 arr/f) (natural_funrank arr/v) ...])))
+                               [(0 arr/f) (natural_funrank val) ...])))
         (side-condition (term (all ((overrank? 0 arr/f)
-                                    (overrank? natural_funrank arr/v) ...))))
+                                    (overrank? natural_funrank val) ...))))
         
         (where ((A () (fun)) ...) (cells/rank 0 arr/f))
         (where ((arr_cell ...) ...)
-               (transpose ((cells/rank natural_funrank arr/v) ...)))
+               (transpose ((cells/rank natural_funrank val) ...)))
         arr/f-map]
-   [--> (in-hole E (arr/f arr/v ...))
-        (in-hole E (arr/f_natrank arr/v ...))
+   [--> (in-hole E (arr/f val ...))
+        (in-hole E (arr/f_natrank val ...))
         (where (A (num_dim ...) (fun ...)) arr/f)
         ; don't naturalize if function array elts are already natural-ranked
         (side-condition (not (redex-match Arrays ((natural ...) ...)
                                           (term ((fun-rank fun) ...)))))
         (where (fun_natrank0 fun_natrank1 ...)
-               ((naturalize-rank fun arr/v ...) ...))
+               ((naturalize-rank fun val ...) ...))
         (where arr/f_natrank (A (num_dim ...) (fun_natrank0 fun_natrank1 ...)))
         ; don't naturalize a scalar containing a builtin where there are no
         ; overranked args
@@ -159,11 +165,11 @@
         ;       of builtins need to be naturalized  to set up for lifting
         (side-condition (or (not (redex-match Arrays (A [] [op]) (term arr/f)))
                             (for/or [(x (term (fun-rank fun_natrank0)))
-                                     (v (term (arr/v ...)))]
+                                     (v (term (val ...)))]
                               (term (overrank? ,x ,v)))))
         arr/f-naturalize]
-   [--> (in-hole E (arr/f arr/v ...))
-        (in-hole E (arr/f_lifted arr/v_lifted ...))
+   [--> (in-hole E (arr/f val ...))
+        (in-hole E (arr/f_lifted val_lifted ...))
         ; require a nonempty array of functions
         (where (A (num_fundim ...) (fun_0 fun_1 ...)) arr/f)
         ; all functions in array must have same expected ranks
@@ -174,10 +180,10 @@
         ; the effective expected rank of `apply' is now (0 num_funrank ...)
         ; ensure they don't all have the same overrank
         (side-condition (not (term (same-overrank?
-                                    [(0 arr/f) (natural_funrank arr/v) ...]))))
-        ; break arr/f into 0-cells, arr/v into num_funrank-cells
-        (where (arr/f_lifted arr/v_lifted ...)
-               (frame-lift ([0 arr/f] [natural_funrank arr/v] ...)))
+                                    [(0 arr/f) (natural_funrank val) ...]))))
+        ; break arr/f into 0-cells, val into num_funrank-cells
+        (where (arr/f_lifted val_lifted ...)
+               (frame-lift ([0 arr/f] [natural_funrank val] ...)))
         arr/f-lift]
    ; collapse an array-of-arrays into flat array
    [--> (in-hole E (A (num_frame-dim ...) (arr/pv ...)))
@@ -187,17 +193,8 @@
         (where any_v ,(foldr append '() (term ((value arr/pv) ...))))
         ; all cells must have the same shape
         (where (num_cell-dim ...) (shape-of-all arr/pv ...))
-        (where ((A (num ...) (base ...)) ...) (arr/pv ...))
+        (where ((A (num ...) (elt ...)) ...) (arr/pv ...))
         collapse]
-   [--> (in-hole E (A (num_frame-dim ...) (arr/pv ...)))
-        ; append cell shape onto frame shape
-        (in-hole E (A (num_frame-dim ... num_cell-dim ...) any_v))
-        ; TODO: tighten this pattern condition?
-        (where any_v ,(foldr append '() (term ((value arr/pv) ...))))
-        ; all cells must have the same shape
-        (where (num_cell-dim ...) (shape-of-all arr/pv ...))
-        (where ((A (num ...) (fun ...)) ...) (arr/pv ...))
-        collapse2]
    [--> (in-hole E (A [] [box-val]))
         (in-hole E box-val)
         box-collapse]
@@ -361,6 +358,8 @@
   [(apply-op reduce arr_fun arr_base arr_arg)
    (tree-apply arr_fun arr_base (arr_cell ...))
    (where (arr_cell ...) (cells/rank -1 arr_arg))]
+  [(apply-op shape-of (arr))
+   (A ((rank arr)) (shape arr))]
   #;[(apply-op reshape arr_newshape arr_elts)
      (op/reshape arr_newshape arr_elts)]
   )
