@@ -1,8 +1,7 @@
 #lang racket
 
-(require rackunit
-         redex)
-(provide Arrays
+(require redex)
+(provide Arrays ->Array
          take/m drop/m take-right/m drop-right/m prefix?
          shape)
 
@@ -817,169 +816,172 @@
 (module+
  test
  
+ (require rackunit
+          "redex-utils.rkt")
+ 
  ; three simple examples for how rank affects array lifting
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar +) (A (3 3) (1 2 3
-                                 4 5 6
-                                 7 8 9))
+                               4 5 6
+                               7 8 9))
                      (A (3) (10 20 30)))))
-  (term ((A (3 3) (11 12 13
-                      24 25 26
-                      37 38 39)))))
+  (term (A (3 3) (11 12 13
+                  24 25 26
+                  37 38 39))))
  
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((sλ ([x 1][y 1]) ((scalar +) x y)) (A (3 3) (1 2 3
-                                                         4 5 6
-                                                         7 8 9))
+                                                       4 5 6
+                                                       7 8 9))
                                              (A (3) (10 20 30)))))
-  (term ((A (3 3) (11 22 33
-                      14 25 36
-                      17 28 39)))))
+  (term (A (3 3) (11 22 33
+                  14 25 36
+                  17 28 39))))
  
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((sλ ([x -1][y 1]) ((scalar +) x y)) (A (3 3) (1 2 3
                                                           4 5 6
                                                           7 8 9))
                                               (A (3) (10 20 30)))))
-  (term ((A (3 3) (11 22 33
-                      14 25 36
-                      17 28 39)))))
+  (term (A (3 3) (11 22 33
+                  14 25 36
+                  17 28 39))))
  
  ; reducing/folding along different axes/directions
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar reduce)
           (scalar +) (A [3] [0 0 0])
           (A (3 3) (1 2 3
-                      4 5 6
-                      7 8 9)))))
-  (term ((A (3) (12 15 18)))))
+                    4 5 6
+                    7 8 9)))))
+  (term (A (3) (12 15 18))))
  
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar fold/r)
           (scalar -) (scalar 0)
           (A (4) (1 1 1 1)))))
-  (term ((A () (0)))))
+  (term (A () (0))))
  
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar fold/l)
           (scalar -) (scalar 0)
           (A (4) (1 1 1 1)))))
-  (term ((A () (-4)))))
+  (term (A () (-4))))
  
  
  ;; builtin whole-array operators:
  ; append
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar append) (A (3 2) (2 3 4 5 6 7))
                           (A (2 2) (0 1 -1 -2)))))
-  (term ((A (5 2) (2 3 4 5 6 7 0 1 -1 -2)))))
+  (term (A (5 2) (2 3 4 5 6 7 0 1 -1 -2))))
  ; itemize
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar itemize) (A (3 2) (2 3 4 5 6 7)))))
-  (term ((A (1 3 2) (2 3 4 5 6 7)))))
+  (term (A (1 3 2) (2 3 4 5 6 7))))
  ; transpose
  (check-equal?
   (term (op/transpose (A (3) (2 0 1)) (A (1 2 3) (90 80 70 60 50 40))))
   (term (A (3 1 2) (90 60 80 50 70 40))))
  ; head
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar head) (A (4) (2 5 4 1)))))
-  (term ((A () (2)))))
+  (term (A () (2))))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar head) (A (4 2) (3 6 5 9 7 1 0 8)))))
-  (term ((A (2) (3 6)))))
+  (term (A (2) (3 6))))
  ; behead
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar behead) (A (4) (2 5 4 1)))))
-  (term ((A (3) (5 4 1)))))
+  (term (A (3) (5 4 1))))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar behead) (A (4 2) (3 6 5 9 7 1 0 8)))))
-  (term ((A (3 2) (5 9 7 1 0 8)))))
+  (term (A (3 2) (5 9 7 1 0 8))))
  ; tail
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar tail) (A (4) (2 5 4 1)))))
-  (term ((A () (1)))))
+  (term (A () (1))))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar tail) (A (4 2) (3 6 5 9 7 1 0 8)))))
-  (term ((A (2) (0 8)))))
+  (term (A (2) (0 8))))
  ; curtail
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar curtail) (A (4) (2 5 4 1)))))
-  (term ((A (3) (2 5 4)))))
+  (term (A (3) (2 5 4))))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar curtail) (A (4 2) (3 6 5 9 7 1 0 8)))))
-  (term ((A (3 2) (3 6 5 9 7 1)))))
+  (term (A (3 2) (3 6 5 9 7 1))))
  ; shape-of
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar shape-of) (A (4 2) (3 6 5 9 7 1 0 8)))))
-  (term ((A (2) (4 2)))))
+  (term (A (2) (4 2))))
  ; reshape
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar reshape) (A (2) (2 3)) (A (3 4) (2 9 4 3 5 2 7 4 2 1 0 9)))))
-  (term ((box (A (2 3) (2 9 4 3 5 2))))))
+  (term (box (A (2 3) (2 9 4 3 5 2)))))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar reshape) (A (2) (3 3)) (A (4) (2 9 4 3)))))
-  (term ((box (A (3 3) (2 9 4 3 2 9 4 3 2))))))
+  (term (box (A (3 3) (2 9 4 3 2 9 4 3 2)))))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar reshape) (A (2 2) (3 3 4 2)) (A (4) (2 9 4 3)))))
-  (term ((A [2] [(box (A (3 3) (2 9 4 3 2 9 4 3 2)))
-                 (box (A (4 2) (2 9 4 3 2 9 4 3)))]))))
+  (term (A [2] [(box (A (3 3) (2 9 4 3 2 9 4 3 2)))
+                (box (A (4 2) (2 9 4 3 2 9 4 3)))])))
  ; nub-sieve
  (check-equal?
   (term (op/nub-sieve (A (3 4) (2 9 4 3 5 2 7 4 2 1 0 9))))
   (term (A (3 4) (#t #t #t #t #t #f #t #f #f #t #t #f))))
  ; iota
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar iota) (A (3) (2 1 3)))))
-  (term ((box (A (2 1 3) (0 1 2 3 4 5))))))
+  (term (box (A (2 1 3) (0 1 2 3 4 5)))))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((scalar iota) (A (2 2) (2 1 4 3)))))
-  (term ((A (2) ((box (A (2 1) (0 1)))
-                 (box (A (4 3) (0 1 2 3 4 5 6 7 8 9 10 11))))))))
+  (term (A (2) ((box (A (2 1) (0 1)))
+                (box (A (4 3) (0 1 2 3 4 5 6 7 8 9 10 11)))))))
  
  
  ; some terms which should not be reducible (due to shape mismatch)
@@ -1000,31 +1002,31 @@
  
  ; make sure currying doesn't change how lifting works
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term (((sλ ([x 0]) (sλ ([y 0]) ((scalar +) x y))) (A () (5))) (A () (10)))))
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((sλ ([x 0] [y 0]) ((scalar +) x y)) (A () (5)) (A () (10))))))
  
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term (((sλ ([x 0]) (sλ ([y 0]) ((scalar +) x y)))
            (A () (5)))
           (A (2) (10 20)))))
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((sλ ([x 0] [y 0]) ((scalar +) x y)) (A () (5)) (A (2) (10 20))))))
  
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term (((sλ ([x 0]) (sλ ([y 0]) ((scalar +) x y)))
            (A (2 2) (1 2
                        3 4)))
           (A (2) (10 20)))))
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((sλ ([x 0] [y 0]) ((scalar +) x y))
           (A (2 2) (1 2
@@ -1033,82 +1035,82 @@
  
  ; check that arrays of functions with non-natural rank get applied properly
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((A (2) ((λ ([x +inf.0]) ((scalar *) (scalar 10) x))
                   (λ ([x +inf.0]) ((scalar -) x (scalar 5)))))
           (A (4) (1 2 3 4)))))
-  (term ((A (2 4) (10 20 30 40
-                      -4 -3 -2 -1)))))
+  (term (A (2 4) (10 20 30 40
+                  -4 -3 -2 -1))))
  
  ; currying with non-natural rank
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term (((sλ ([x 0]) (sλ ([y -1]) ((scalar +) x y)))
            (A (2) (1 2)))
           (A (2 2) (10 20 30 40)))))
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((sλ ([x 0][y -1]) ((scalar +) x y))
           (A (2) (1 2))
           (A (2 2) (10 20 30 40))))))
  
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term (((sλ ([x -1]) (sλ ([y 0]) ((scalar +) x y)))
            (A (2) (1 2)))
           (A (2 2) (10 20 30 40)))))
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((sλ ([x -1][y 0]) ((scalar +) x y))
           (A (2) (1 2))
           (A (2 2) (10 20 30 40))))))
  
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term (((sλ ([x 0]) (sλ ([y +inf.0]) ((scalar +) x y)))
            (A (2) (1 2)))
           (A (2 2) (10 20 30 40)))))
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((sλ ([x 0][y +inf.0]) ((scalar +) x y))
           (A (2) (1 2))
           (A (2 2) (10 20 30 40))))))
  
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term (((sλ ([x -1]) (sλ ([y +inf.0]) ((scalar +) x y)))
            (A (2) (1 2)))
           (A (2 2) (10 20 30 40)))))
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((sλ ([x -1][y +inf.0]) ((scalar +) x y))
           (A (2) (1 2))
           (A (2 2) (10 20 30 40))))))
  
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term (((sλ ([x +inf.0]) (sλ ([y 0]) ((scalar +) x y)))
            (A (2) (1 2)))
           (A (2 2) (10 20 30 40)))))
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((sλ ([x +inf.0][y 0]) ((scalar +) x y))
           (A (2) (1 2))
           (A (2 2) (10 20 30 40))))))
  
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term (((sλ ([x +inf.0]) (sλ ([y +inf.0]) ((scalar +) x y)))
            (A (2) (1 2)))
           (A (2 2) (10 20 30 40)))))
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((sλ ([x +inf.0][y +inf.0]) ((scalar +) x y))
           (A (2) (1 2))
@@ -1116,65 +1118,65 @@
  
  ; make sure naturalization works on builtin ops too
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ((A [2] [append append])
           (A [4] [2 3 4 5])
           (A [4] [1 10 100 1000]))))
-  (term ((A [2 8] [2 3 4 5 1 10 100 1000 2 3 4 5 1 10 100 1000]))))
+  (term (A [2 8] [2 3 4 5 1 10 100 1000 2 3 4 5 1 10 100 1000])))
  
  
  ; reducing within a box
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term (box ([scalar +] (A [3] [9 8 7]) [scalar 4]))))
-  (term ((box (A [3] [13 12 11])))))
+  (term (box (A [3] [13 12 11]))))
  
  ; η-expanded box
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ([scalar (λ [(x 0)] (box x))] ([scalar +] [scalar 3] [scalar 4]))))
-  (term ((box [scalar 7]))))
+  (term (box [scalar 7])))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ([scalar (λ [(x 1)] (box x))]
           ([scalar +] (A [3] [9 8 7]) [scalar 4]))))
-  (term ((box (A [3] [13 12 11])))))
+  (term (box (A [3] [13 12 11]))))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ([scalar (λ [(x +inf.0)] (box x))]
           ([scalar +] (A [3] [9 8 7]) [scalar 4]))))
-  (term ((box (A [3] [13 12 11])))))
+  (term (box (A [3] [13 12 11]))))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ([scalar (λ [(x 0)] (box x))]
           ([scalar +] (A [3] [9 8 7]) [scalar 4]))))
-  (term ((A [3] [(box [scalar 13]) (box [scalar 12]) (box [scalar 11])]))))
+  (term (A [3] [(box [scalar 13]) (box [scalar 12]) (box [scalar 11])])))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ([scalar (λ [(x -1)] (box x))]
           ([scalar +] (A [3] [9 8 7]) [scalar 4]))))
-  (term ((A [3] [(box [scalar 13]) (box [scalar 12]) (box [scalar 11])]))))
+  (term (A [3] [(box [scalar 13]) (box [scalar 12]) (box [scalar 11])])))
  
  ; compose
  (define Array-compose
    (term (λ [(f +inf.0) (g +inf.0)]
            [scalar (λ [(x +inf.0)] (f (g x)))])))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term (([scalar (λ [(f +inf.0) (g +inf.0)]
                      [scalar (λ [(x +inf.0)] (f (g x)))])]
            [scalar (λ [(n 0)] ([scalar +] [scalar 1] n))]
            [scalar (λ [(n 0)] ([scalar *] [scalar 2] n))])
           [scalar 4])))
-  (term ([scalar 9])))
+  (term [scalar 9]))
  
  
  ; factorial
@@ -1184,7 +1186,7 @@
                   ([scalar reduce] [scalar *] [scalar 1]
                                    ([scalar +] [scalar 1] x))))))
  (check-equal?
-  (apply-reduction-relation*
+  (deterministic-reduce
    ->Array
    (term ([scalar ,Array-fact] (A [4] [0 1 3 5]))))
-  (term ((A [4] [1 1 6 120])))))
+  (term (A [4] [1 1 6 120]))))
