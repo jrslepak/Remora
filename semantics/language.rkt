@@ -192,14 +192,13 @@
    (arr/f (chain-apply/l arr/f (arr_0 ...)) arr_1)])
 ;; similar to chain-apply but for tree-shaped application to the arrays
 (define-metafunction Arrays
-  tree-apply : arr/f arr (arr ...) -> any
-  [(tree-apply arr/f arr_base ()) arr_base]
-  [(tree-apply arr/f arr_base (arr)) arr]
-  [(tree-apply arr/f arr_base (arr_0 arr_1)) (arr/f arr_0 arr_1)]
-  [(tree-apply arr/f arr_base (arr ...))
+  tree-apply : arr/f (arr ...) -> any
+  [(tree-apply arr/f (arr)) arr]
+  [(tree-apply arr/f (arr_0 arr_1)) (arr/f arr_0 arr_1)]
+  [(tree-apply arr/f (arr ...))
    ; split as ((arr_0 ...) || (arr_1 ...))
-   (arr/f (tree-apply arr/f arr_base (arr_0 ...))
-          (tree-apply arr/f arr_base (arr_1 ...)))
+   (arr/f (tree-apply arr/f (arr_0 ...))
+          (tree-apply arr/f (arr_1 ...)))
    (where num_length (length/m (arr ...)))
    (where (arr_0 ...) (take/m (arr ...) ,(quotient (term num_length) 2)))
    (where (arr_1 ...) (drop/m (arr ...) ,(quotient (term num_length) 2)))])
@@ -326,8 +325,8 @@
   [(apply-op iota ((A (num_dim) (num_elt ...))))
    (box (A (num_elt ...) ,(for/list [(n (foldr * 1 (term (num_elt ...))))] n)))
    (where (natural ...) (num_elt ... ))]
-  [(apply-op reduce (arr_fun arr_base arr_arg))
-   (tree-apply arr_fun arr_base (arr_cell ...))
+  [(apply-op reduce (arr_fun arr_arg))
+   (tree-apply arr_fun (arr_cell ...))
    (where (arr_cell ...) (cells/rank -1 arr_arg))]
   [(apply-op fold/r (arr_fun arr_base arr_arg))
    (chain-apply/r arr_fun (arr_cell ... arr_base))
@@ -364,7 +363,7 @@
   [(fun-rank tail) (+inf.0)]
   [(fun-rank curtail) (+inf.0)]
   [(fun-rank iota) (1)]
-  [(fun-rank reduce) (+inf.0 +inf.0 +inf.0)]
+  [(fun-rank reduce) (+inf.0 +inf.0)]
   [(fun-rank fold/r) (+inf.0 +inf.0 +inf.0)]
   [(fun-rank fold/l) (+inf.0 +inf.0 +inf.0)]
   [(fun-rank (λ [(var num) ...] expr)) (num ...)])
@@ -813,8 +812,8 @@
   (deterministic-reduce
    ->Array
    (term ((sλ ([x -1][y 1]) ((scalar +) x y)) (A (3 3) (1 2 3
-                                                          4 5 6
-                                                          7 8 9))
+                                                        4 5 6
+                                                        7 8 9))
                                               (A (3) (10 20 30)))))
   (term (A (3 3) (11 22 33
                   14 25 36
@@ -825,7 +824,7 @@
   (deterministic-reduce
    ->Array
    (term ((scalar reduce)
-          (scalar +) (A [3] [0 0 0])
+          (scalar +)
           (A (3 3) (1 2 3
                     4 5 6
                     7 8 9)))))
@@ -968,7 +967,7 @@
   (apply-reduction-relation
    ->Array
    (term ((scalar +) (A (2 3) (1 2 3
-                                 4 5 6))
+                               4 5 6))
                      (A (3) (10 20 30)))))
   '())
  
@@ -1155,8 +1154,10 @@
  (define Array-fact
    (term (λ [(n 0)]
            (unbox x ⇐ ([scalar iota] (A [1] [n]))
-                  ([scalar reduce] [scalar *] [scalar 1]
-                                   ([scalar +] [scalar 1] x))))))
+                  ([scalar reduce] [scalar *]
+                                   ([scalar append]
+                                    (A [1] [1])
+                                    ([scalar +] [scalar 1] x)))))))
  (check-equal?
   (deterministic-reduce
    ->Array
