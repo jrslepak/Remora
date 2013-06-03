@@ -73,49 +73,10 @@
   (reduction-relation
    Arrays
    #:domain expr
-   ; TODO: handle these with "op" rule
-   [--> (in-hole E ((A () (reduce)) arr/f arr/v_base arr/v))
-        (in-hole E (tree-apply arr/f arr/v_base (arr/v_cell ...)))
-        (where (arr/v_cell ...) (cells/rank -1 arr/v))
-        reduce]
-   [--> (in-hole E ((A () (fold/r)) arr/f arr/v_0 arr/v_1))
-        (in-hole E (chain-apply/r arr/f (arr/v_cell ... arr/v_0)))
-        (where (arr/v_cell ...) (cells/rank -1 arr/v_1))
-        fold/r]
-   [--> (in-hole E ((A () (fold/l)) arr/f arr/v_0 arr/v_1))
-        (in-hole E (chain-apply/l arr/f (arr/v_0 arr/v_cell ...)))
-        (where (arr/v_cell ...) (cells/rank -1 arr/v_1))
-        fold/l]
-   [--> (in-hole E ((A () (append)) arr/v_0 arr/v_1))
-        (in-hole E (op/append arr/v_0 arr/v_1))
-        append]
-   [--> (in-hole E ((A () (itemize)) arr/v))
-        (in-hole E (op/itemize arr/v))
-        itemize]
-   [--> (in-hole E ((A () (head)) arr/v))
-        (in-hole E (op/head arr/v))
-        head]
-   [--> (in-hole E ((A () (behead)) arr/v))
-        (in-hole E (op/behead arr/v))
-        behead]
-   [--> (in-hole E ((A () (tail)) arr/v))
-        (in-hole E (op/tail arr/v))
-        tail]
-   [--> (in-hole E ((A () (curtail)) arr/v))
-        (in-hole E (op/curtail arr/v))
-        curtail]
-   [--> (in-hole E ((A () (shape-of)) (A (num_dim ...) (elt ...))))
-        (in-hole E (A (num_rank) (num_dim ...)))
-        (where num_rank (length/m (num_dim ...)))
-        shape-of]
-   [--> (in-hole E ((A () (reshape)) arr/v_0 arr/v_1))
-        (in-hole E (op/reshape arr/v_0 arr/v_1))
-        (side-condition (= 1 (term (rank arr/v_0))))
-        reshape]
    [--> (in-hole E ((A () (op)) val ...))
         (in-hole E (apply-op op (val ...)))
-        (side-condition (equal? (term (fun-rank op))
-                                (term  ((rank val) ...))))
+        (where (num_argrank ...) (fun-rank op))
+        (side-condition (term (all ((at-rank? num_argrank val) ...))))
         op]
    [--> (in-hole E ((A () ((λ [(var natural) ...] expr))) val ...))
         (in-hole E (subst [(var val) ...] expr))
@@ -148,7 +109,7 @@
         
         (where ((A () (fun)) ...) (cells/rank 0 arr/f))
         (where ((arr_cell ...) ...)
-               (transpose ((cells/rank natural_funrank val) ...)))
+               (transpose/m ((cells/rank natural_funrank val) ...)))
         arr/f-map]
    [--> (in-hole E (arr/f val ...))
         (in-hole E (arr/f_natrank val ...))
@@ -205,7 +166,7 @@
 
 
 
-;; macro to convert number to rank-0 array
+;; macro to convert term to rank-0 array
 (define-metafunction Arrays
   scalar : any -> arr
   [(scalar any) (A () (any))])
@@ -236,7 +197,7 @@
   [(tree-apply arr/f arr_base (arr)) arr]
   [(tree-apply arr/f arr_base (arr_0 arr_1)) (arr/f arr_0 arr_1)]
   [(tree-apply arr/f arr_base (arr ...))
-   #;((arr_0 ...) || (arr_1 ...))
+   ; split as ((arr_0 ...) || (arr_1 ...))
    (arr/f (tree-apply arr/f arr_base (arr_0 ...))
           (tree-apply arr/f arr_base (arr_1 ...)))
    (where num_length (length/m (arr ...)))
@@ -315,13 +276,12 @@
   [(cell-apply fun ()) ()]
   [(cell-apply fun (() ...)) ()]
   [(cell-apply fun ((arr ...) ...))
-   ; TODO: why cons? better to do this with pattern
    ,(cons (cons (term fun) (map first (term ((arr ...) ...))))
           (term (cell-apply fun ,(map rest (term ((arr ...) ...))))))])
 
 ;; apply a builtin operator
 (define-metafunction Arrays
-  apply-op : op (arr ...) -> arr
+  apply-op : op (arr ...) -> expr
   [(apply-op + ((A () (num_1)) (A () (num_2))))
    (A () (,(+ (term num_1) (term num_2))))]
   [(apply-op - ((A () (num_1)) (A () (num_2))))
@@ -352,17 +312,29 @@
    (A () (,(log (term num))))]
   [(apply-op append (arr_1 arr_2))
    (op/append arr_1 arr_2)]
+  [(apply-op itemize ((A (num ...) (el-expr ...))))
+   (A (1 num ...) (el-expr ...))]
+  [(apply-op shape-of (arr))
+   (A ((rank arr)) (shape arr))]
+  [(apply-op reshape (arr_0 arr_1)) (op/reshape arr_0 arr_1)]
+  [(apply-op transpose (arr_0 arr_1)) (op/transpose arr_0 arr_1)]
+  [(apply-op nub-sieve (arr)) (op/nub-sieve arr)]
+  [(apply-op head (arr)) (op/head arr)]
+  [(apply-op behead (arr)) (op/behead arr)]
+  [(apply-op tail (arr)) (op/tail arr)]
+  [(apply-op curtail (arr)) (op/curtail arr)]
   [(apply-op iota ((A (num_dim) (num_elt ...))))
    (box (A (num_elt ...) ,(for/list [(n (foldr * 1 (term (num_elt ...))))] n)))
    (where (natural ...) (num_elt ... ))]
-  [(apply-op reduce arr_fun arr_base arr_arg)
+  [(apply-op reduce (arr_fun arr_base arr_arg))
    (tree-apply arr_fun arr_base (arr_cell ...))
    (where (arr_cell ...) (cells/rank -1 arr_arg))]
-  [(apply-op shape-of (arr))
-   (A ((rank arr)) (shape arr))]
-  #;[(apply-op reshape arr_newshape arr_elts)
-     (op/reshape arr_newshape arr_elts)]
-  )
+  [(apply-op fold/r (arr_fun arr_base arr_arg))
+   (chain-apply/r arr_fun (arr_cell ... arr_base))
+   (where (arr_cell ...) (cells/rank -1 arr_arg))]
+  [(apply-op fold/l (arr_fun arr_base arr_arg))
+   (chain-apply/l arr_fun (arr_base arr_cell ...))
+   (where (arr_cell ...) (cells/rank -1 arr_arg))])
 
 ;; extract or look up ranks of a function
 (define-metafunction Arrays
@@ -386,20 +358,16 @@
   [(fun-rank shape-of) (+inf.0)]
   [(fun-rank reshape) (1 +inf.0)]
   [(fun-rank transpose) (1 +inf.0)]
+  [(fun-rank nub-sieve) (+inf.0)]
   [(fun-rank head) (+inf.0)]
   [(fun-rank behead) (+inf.0)]
   [(fun-rank tail) (+inf.0)]
   [(fun-rank curtail) (+inf.0)]
   [(fun-rank iota) (1)]
-  [(fun-rank (λ [(var num) ...] expr)) (num ...)]
-  ;[(fun-rank reduce) (+inf.0)]
   [(fun-rank reduce) (+inf.0 +inf.0 +inf.0)]
-  ;[(fun-rank (reduce expr)) (+inf.0)]
   [(fun-rank fold/r) (+inf.0 +inf.0 +inf.0)]
-  ;[(fun-rank (fold/r expr)) (+inf.0)]
   [(fun-rank fold/l) (+inf.0 +inf.0 +inf.0)]
-  ;[(fun-rank (fold/l expr)) (+inf.0)]
-  )
+  [(fun-rank (λ [(var num) ...] expr)) (num ...)])
 
 
 ;;; metafunctions for handling primitive operations that process arrays
@@ -446,16 +414,16 @@
 (define-metafunction Arrays
   op/nub-sieve : arr -> arr
   [(op/nub-sieve (A (num_dim ...) (elt ...)))
-   (A (num_dim ...) (nub-sieve (elt ...)))])
+   (A (num_dim ...) (nub-sieve/m (elt ...)))])
 (define-metafunction Arrays
-  nub-sieve : (any ...) -> (bool ...)
-  [(nub-sieve (any_0 ... any_1 any_2 ... any_1))
+  nub-sieve/m : (any ...) -> (bool ...)
+  [(nub-sieve/m (any_0 ... any_1 any_2 ... any_1))
    (any_nubbed ... #f)
-   (where (any_nubbed ...) (nub-sieve (any_0 ... any_1 any_2 ...)))]
-  [(nub-sieve (any_0 ... any_1))
+   (where (any_nubbed ...) (nub-sieve/m (any_0 ... any_1 any_2 ...)))]
+  [(nub-sieve/m (any_0 ... any_1))
    (any_nubbed ... #t)
-   (where (any_nubbed ...) (nub-sieve (any_0 ...)))]
-  [(nub-sieve ()) ()])
+   (where (any_nubbed ...) (nub-sieve/m (any_0 ...)))]
+  [(nub-sieve/m ()) ()])
 (define-metafunction Arrays
   op/head : arr -> arr
   [(op/head (A (num_len num_dim ...) (el-expr_val ...)))
@@ -804,12 +772,12 @@
 ;; transpose ((x_1,1 x_1,2 ...) (x_2,1 x_2,2 ...) ...)
 ;; to ((x_1,1 x_2,1 ...) (x_1,2 x_2,2 ...) ...)
 (define-metafunction Arrays
-  transpose : ((any ...) ...) -> ((any ...) ...)
-  [(transpose ()) ()]
-  [(transpose (() ...)) ()]
-  [(transpose ((any_0 any_1 ...) ...))
+  transpose/m : ((any ...) ...) -> ((any ...) ...)
+  [(transpose/m ()) ()]
+  [(transpose/m (() ...)) ()]
+  [(transpose/m ((any_0 any_1 ...) ...))
    ,(cons (term (any_0 ...))
-          (term (transpose ((any_1 ...) ...))))])
+          (term (transpose/m ((any_1 ...) ...))))])
 
 
 (module+
@@ -879,6 +847,7 @@
           (A (4) (1 1 1 1)))))
   (term (A () (-4))))
  
+ ;; TODO: builtin scalar operators:
  
  ;; builtin whole-array operators:
  ; append
@@ -894,10 +863,41 @@
    ->Array
    (term ((scalar itemize) (A (3 2) (2 3 4 5 6 7)))))
   (term (A (1 3 2) (2 3 4 5 6 7))))
+ ; shape-of
+ (check-equal?
+  (deterministic-reduce
+   ->Array
+   (term ((scalar shape-of) (A (4 2) (3 6 5 9 7 1 0 8)))))
+  (term (A (2) (4 2))))
+ ; reshape
+ (check-equal?
+  (deterministic-reduce
+   ->Array
+   (term ((scalar reshape) (A (2) (2 3)) (A (3 4) (2 9 4 3 5 2 7 4 2 1 0 9)))))
+  (term (box (A (2 3) (2 9 4 3 5 2)))))
+ (check-equal?
+  (deterministic-reduce
+   ->Array
+   (term ((scalar reshape) (A (2) (3 3)) (A (4) (2 9 4 3)))))
+  (term (box (A (3 3) (2 9 4 3 2 9 4 3 2)))))
+ (check-equal?
+  (deterministic-reduce
+   ->Array
+   (term ((scalar reshape) (A (2 2) (3 3 4 2)) (A (4) (2 9 4 3)))))
+  (term (A [2] [(box (A (3 3) (2 9 4 3 2 9 4 3 2)))
+                (box (A (4 2) (2 9 4 3 2 9 4 3)))])))
  ; transpose
  (check-equal?
-  (term (op/transpose (A (3) (2 0 1)) (A (1 2 3) (90 80 70 60 50 40))))
+  (deterministic-reduce
+   ->Array
+   (term ((scalar transpose) (A (3) (2 0 1)) (A (1 2 3) (90 80 70 60 50 40)))))
   (term (A (3 1 2) (90 60 80 50 70 40))))
+ ; nub-sieve
+ (check-equal?
+  (deterministic-reduce
+   ->Array
+   (term ((scalar nub-sieve) (A (3 4) (2 9 4 3 5 2 7 4 2 1 0 9)))))
+  (term (A (3 4) (#t #t #t #t #t #f #t #f #f #t #t #f))))
  ; head
  (check-equal?
   (deterministic-reduce
@@ -942,33 +942,6 @@
    ->Array
    (term ((scalar curtail) (A (4 2) (3 6 5 9 7 1 0 8)))))
   (term (A (3 2) (3 6 5 9 7 1))))
- ; shape-of
- (check-equal?
-  (deterministic-reduce
-   ->Array
-   (term ((scalar shape-of) (A (4 2) (3 6 5 9 7 1 0 8)))))
-  (term (A (2) (4 2))))
- ; reshape
- (check-equal?
-  (deterministic-reduce
-   ->Array
-   (term ((scalar reshape) (A (2) (2 3)) (A (3 4) (2 9 4 3 5 2 7 4 2 1 0 9)))))
-  (term (box (A (2 3) (2 9 4 3 5 2)))))
- (check-equal?
-  (deterministic-reduce
-   ->Array
-   (term ((scalar reshape) (A (2) (3 3)) (A (4) (2 9 4 3)))))
-  (term (box (A (3 3) (2 9 4 3 2 9 4 3 2)))))
- (check-equal?
-  (deterministic-reduce
-   ->Array
-   (term ((scalar reshape) (A (2 2) (3 3 4 2)) (A (4) (2 9 4 3)))))
-  (term (A [2] [(box (A (3 3) (2 9 4 3 2 9 4 3 2)))
-                (box (A (4 2) (2 9 4 3 2 9 4 3)))])))
- ; nub-sieve
- (check-equal?
-  (term (op/nub-sieve (A (3 4) (2 9 4 3 5 2 7 4 2 1 0 9))))
-  (term (A (3 4) (#t #t #t #t #t #f #t #f #f #t #t #f))))
  ; iota
  (check-equal?
   (deterministic-reduce
