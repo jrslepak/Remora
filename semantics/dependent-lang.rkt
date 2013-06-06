@@ -673,6 +673,8 @@
   [(canonicalize-type (type_arg ... -> type_result))
    ((canonicalize-type type_arg) ... -> (canonicalize-type type_result))]
   ; the interesting cases are for nested arrays
+  [(canonicalize-type (Array idx (Σ [(var sort) ...] type)))
+   (canonicalize-type (Σ [(var sort) ...] type))]
   ; make sure the element type isn't another array
   [(canonicalize-type (Array idx type))
    (Array (canonicalize-index idx) (canonicalize-type type))
