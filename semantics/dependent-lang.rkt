@@ -7,7 +7,9 @@
 (define-extended-language Dependent Arrays
   ; may also want to add a type annotation to array syntax
   ; (A type (num ...) (el-expr ...)), etc.
-  (expr ....
+  (expr (expr expr ...) ; include bits from untyped language, but not boxing
+        arr
+        var
         ; type abstraction (or should this be at `fun' level?)
         (T-λ [var ...] expr)
         ; type application
