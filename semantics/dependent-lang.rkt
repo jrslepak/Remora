@@ -62,7 +62,7 @@
        ; we require [shape naturalized-rank] pairs
        ; TODO: probably going to need more operations on shapes eventually
        ; addition, multiplication?
-       (frame [idx idx] ...)
+       (PLUS idx idx)
        ; extract the `var' witness from dependent sum
        (Σ-WITNESS var expr)
        var)
@@ -204,14 +204,10 @@
   [---
    (sort-of ([var_0 sort_0] ... [var sort] [var_1 sort_1] ...)
             kind-env type-env var sort)]
-  [(sort-of sort-env kind-env type-env idx_shape Shape) ...
-   (sort-of sort-env kind-env type-env idx_rank Nat) ...
-   ; TODO: will need a separate metafunction for this
-   ; may also need to track actual index values
-   ; or is that left to constraint generation?
-   #;(side-condition (valid-shape (frame [idx_shape idx_rank] ...)))
-   --- sort-frame
-   (sort-of sort-env kind-env type-env (frame [idx_shape idx_rank] ...) Shape)]
+  [(sort-of sort-env kind-env type-env idx_1 Nat)
+   (sort-of sort-env kind-env type-env idx_2 Nat)
+   ---
+   (sort-of sort-env kind-env type-env (PLUS idx_1 idx_2) Nat)]
   [(type-of sort-env kind-env type-env expr
             (Σ [(var_0 sort_0) ... (var sort) (var_1 sort_1) ...] type))
    ---
@@ -283,7 +279,6 @@
 ;  right now, only canonicalize-index uses this, and only for handling
 ;  the `frame' index-level computation form
 ; TODO: check for prefix agreement
-;  should reject (term (frame-shape (frame [0 (S 3)] [0 (S 2)])))
 (define-metafunction Dependent
   frame-shape : (natural ...) (idx ...) -> idx
   [(frame-shape (natural_rank ...) (idx ...))
@@ -313,7 +308,9 @@
    (Array idx_1 (Array idx_2 hole))]
   [(frame-contribution (Array (S idx_0 ...) type)
                        (Array (S idx_0 ... idx_1 ...) type))
-   (Array (S idx_1 ...) hole)])
+   (Array (S idx_1 ...) hole)]
+  [(frame-contribution (Array (Σ-WITNESS var expr) type))
+   (Array (Σ-WITNESS var expr) hole)])
 
 ; find the frame-struct that is prefixed by all other frame-structs in the list
 ; this is essentially a left fold with larger-frame
@@ -405,11 +402,7 @@
   primop-type : fun -> type
   [(primop-type +) ((Array (S) Num)
                     (Array (S) Num)
-                    -> (Array (S) Num))]
-  #;[(primop-type +) (Π [(s1 Shape) (s2 Shape)]
-                        ((Array s1 Num)
-                         (Array s2 Num)
-                         -> (Array (frame [s1 0] [s2 0]) Num)))])
+                    -> (Array (S) Num))])
 
 ; determine the argument ranks a function expects
 (define-metafunction Dependent
@@ -515,8 +508,8 @@
   [(index/index-sub idx-env var) var]
   [(index/index-sub idx-env natural) natural]
   [(index/index-sub idx-env (S idx ...)) (S (index/index-sub idx-env idx) ...)]
-  [(index/index-sub idx-env (frame [idx_shape idx_rank] ...))
-   (frame [(index-sub idx-env idx_shape) (index-sub idx-env idx_rank)] ...)]
+  [(index/index-sub idx-env (PLUS idx_0 idx_1))
+   (PLUS (index-sub idx-env idx_0) (index-sub idx-env idx_1))]
   [(index/index-sub idx-env (Σ-WITNESS var expr))
    (Σ-WITNESS (index/index-sub idx-env var) (index/index-sub idx-env expr))])
 
@@ -586,9 +579,8 @@
   [(type/index-sub type-env natural) natural]
   [(type/index-sub type-env (S idx ...))
    (S (type/index-sub type-env idx) ...)]
-  [(type/index-sub type-env (frame [idx_s idx_r] ...))
-   (frame [(type/index-sub type-env idx_s)
-           (type/index-sub type-env idx_r)] ...)]
+  [(type/index-sub type-env (PLUS idx_0 idx_1))
+   (PLUS (type/index-sub type-env idx_0) (type/index-sub type-env idx_1))]
   [(type/index-sub type-env (Σ-WITNESS var expr))
    (Σ-WITNESS var (type/expr-sub type-env expr))])
 
@@ -657,9 +649,8 @@
   [(expr/index-sub expr-env natural) natural]
   [(expr/index-sub expr-env (S idx ...))
    (S (expr/index-sub expr-env idx) ...)]
-  [(expr/index-sub expr-env (frame [idx_s idx_r] ...))
-   (frame [((expr/index-sub expr-env idx_s)
-            (expr/index-sub expr-env idx_r)) ...])]
+  [(expr/index-sub expr-env (PLUS idx_0 idx_1))
+   (PLUS (expr/index-sub expr-env idx_0) (expr/index-sub expr-env idx_1))]
   [(expr/index-sub expr-env (Σ-WITNESS var expr))
    (Σ-WITNESS var (expr/index-sub expr-env expr))])
 
@@ -710,9 +701,33 @@
   ; for shapes, recur on their axes
   [(canonicalize-index (S idx ...)) (S (canonicalize-index idx) ...)]
   ; index-level computation
-  [(canonicalize-index (frame [idx_rank idx_shape] ...))
-   (frame-shape [(canonicalize-index idx_rank) ...]
-                [(canonicalize-index idx_shape) ...])])
+  [(canonicalize-index (PLUS natural_0 natural_1))
+   ,(+ (term natural_0) (term natural_1))]
+  [(canonicalize-index (PLUS idx_0 idx_1))
+   (summands->idx (summand-list (PLUS idx_0 idx_1)))])
+
+; convert an index to a list of summands
+(define-metafunction Dependent
+  summand-list : idx -> (idx ...)
+  ; for a PLUS form, concatenate its summand lists
+  [(summand-list (PLUS idx_0 idx_1))
+   ,(append (term (summand-list idx_0)) (term (summand-list idx_1)))]
+  ; for non-PLUS (natural or var), make a singleton list with the index itself
+  [(summand-list idx) (idx)])
+; convert a list of summands into a possibly-nested PLUS index
+; result should have at most one natural and other summands in standard order
+(define-metafunction Dependent
+  summands->idx : (idx ...) -> idx
+  [(summands->idx (idx ...))
+   ; produce a form like (PLUS var1 (PLUS var2 ... (PLUS varn natural) ...))
+   ,(foldr (λ (idxs v) (term (PLUS ,idxs ,v)))
+           ; sum of all the naturals in the idx list
+           (apply + (filter exact-nonnegative-integer? (term (idx ...))))
+           ; lex-ordered list of all vars in the idx list
+           (sort (filter symbol? (term (idx ...)))
+                 (λ (l r) 
+                   (string<? (symbol->string l) (symbol->string r)))))])
+
 
 ; find the shape that comes from nesting one shape inside another
 (define-metafunction Dependent
@@ -942,17 +957,6 @@
    type)
   (term ((Array (S) [(Array (S 3) Num) -> (Array (S 1 3) Num)]))))
  
- #;(check-equal?
-    (judgment-holds (type-of () () (I-APP + (S 3) (S)) type) type)
-    (term (((Array (S 3) Num)
-            (Array (S) Num)
-            -> (Array (frame [(S 3) 0] [(S) 0]) Num)))))
- 
- ; index application followed by function application
- #;(check-equal?
-    (judgment-holds (type-of () () ((I-APP + (S 3) (S))
-                                    (A (3) (1 2 3)) (A () (10))) type) type)
-    (term ((Array (frame [(S 3) 0] [(S) 0]) Num))))
  
  ; index abstraction
  (check-equal?
