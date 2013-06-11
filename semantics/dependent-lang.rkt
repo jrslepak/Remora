@@ -110,7 +110,7 @@
    --- operator
    (type-of sort-env kind-env type-env op type)]
   ; λ abstraction: add inputs to type environment, check body
-  [(kind-of sort-env kind-env type-env type_arg) ...
+  [(kind-of sort-env kind-env type_arg) ...
    (type-of sort-env kind-env (type-env-update [var type_arg] ... type-env)
             expr type_body)
    --- lambda
@@ -149,7 +149,7 @@
             (T-λ [var ...] expr_body) (∀ [var ...] type))]
   ; type application
   [(type-of sort-env kind-env type-env expr (∀ (var ...) type))
-   (kind-of sort-env kind-env type-env type_arg) ...
+   (kind-of sort-env kind-env type_arg) ...
    ; make sure array types never get bound -- this restriction is needed for
    ; making function's input types fully determine its expected argument rank
    (side-condition (all-non-array type_arg ...))
@@ -169,8 +169,8 @@
   ; index app: check that indices have proper sort, substitute indices into type
   [(type-of sort-env kind-env type-env expr
             (Array idx_prod (Π ([var sort] ...) type)))
-   (sort-of sort-env kind-env type-env idx_prod Shape)
-   (sort-of sort-env kind-env type-env idx_arg sort) ...
+   (sort-of sort-env idx_prod Shape)
+   (sort-of sort-env idx_arg sort) ...
    --- idx-app
    (type-of sort-env kind-env type-env (I-APP expr idx_arg ...)
             (Array idx_prod (index/type-sub ([var idx_arg] ...) type)))]
@@ -182,7 +182,7 @@
             (index/type-sub [(var (Σ-WITNESS var expr))...] type))]
   
   ; creation of dependent sum
-  [(sort-of sort-env kind-env type-env idx sort) ...
+  [(sort-of sort-env idx sort) ...
    ; type_subbed in the type-of premise is in a position where metafunctions
    ; don't get evaluated, so we have to evaluate it in a `where' clause
    (where type_subbed (index/type-sub [(var idx) ...] type))
@@ -195,56 +195,51 @@
   )
 
 (define-judgment-form Dependent
-  #:contract (sort-of sort-env kind-env type-env idx sort)
-  #:mode (sort-of I I I I O)
+  #:contract (sort-of sort-env idx sort)
+  #:mode (sort-of I I O)
   [#;???
    --- sort-nat
-   (sort-of sort-env kind-env type-env natural Nat)]
-  [(sort-of sort-env kind-env type-env idx Nat) ...
+   (sort-of sort-env natural Nat)]
+  [(sort-of sort-env idx Nat) ...
    --- sort-shape
-   (sort-of sort-env kind-env type-env (S idx ...) Shape)]
+   (sort-of sort-env (S idx ...) Shape)]
   [---
    (sort-of ([var_0 sort_0] ... [var sort] [var_1 sort_1] ...)
-            kind-env type-env var sort)]
-  [(sort-of sort-env kind-env type-env idx_1 Nat)
-   (sort-of sort-env kind-env type-env idx_2 Nat)
+            var sort)]
+  [(sort-of sort-env idx_1 Nat)
+   (sort-of sort-env idx_2 Nat)
    ---
-   (sort-of sort-env kind-env type-env (PLUS idx_1 idx_2) Nat)]
-  [(type-of sort-env kind-env type-env expr
-            (Σ [(var_0 sort_0) ... (var sort) (var_1 sort_1) ...] type))
-   ---
-   (sort-of sort-env kind-env type-env (Σ-WITNESS var expr) sort)]
-  )
+   (sort-of sort-env (PLUS idx_1 idx_2) Nat)])
 
 ; Determine whether a type is well-formed (does not use free variables for
 ; types or indices).
 (define-judgment-form Dependent
-  #:contract (kind-of sort-env kind-env type-env type)
-  #:mode (kind-of I I I I)
+  #:contract (kind-of sort-env kind-env type)
+  #:mode (kind-of I I I)
   [---
-   (kind-of sort-env kind-env type-env base-type)]
+   (kind-of sort-env kind-env base-type)]
   [---
-   (kind-of sort-env ([var_0 ★] ... [var ★] [var_1 ★] ...) type-env var)]
-  [(kind-of (sort-env-update [var sort] ... sort-env) kind-env type-env type)
+   (kind-of sort-env ([var_0 ★] ... [var ★] [var_1 ★] ...) var)]
+  [(kind-of (sort-env-update [var sort] ... sort-env) kind-env type)
    ---
-   (kind-of sort-env kind-env type-env (Π [(var sort) ...] type))]
-  [(kind-of (sort-env-update [var sort] ... sort-env) kind-env type-env type)
+   (kind-of sort-env kind-env (Π [(var sort) ...] type))]
+  [(kind-of (sort-env-update [var sort] ... sort-env) kind-env type)
    ---
-   (kind-of sort-env kind-env type-env (Σ [(var sort) ...] type))]
-  [(kind-of sort-env kind-env type-env type_arg) ...
-   (kind-of sort-env kind-env type-env type_result)
+   (kind-of sort-env kind-env (Σ [(var sort) ...] type))]
+  [(kind-of sort-env kind-env type_arg) ...
+   (kind-of sort-env kind-env type_result)
    ---
-   (kind-of sort-env kind-env type-env (type_arg ... -> type_result))]
-  [(kind-of sort-env kind-env type-env type) ...
+   (kind-of sort-env kind-env (type_arg ... -> type_result))]
+  [(kind-of sort-env kind-env type) ...
    ---
-   (kind-of sort-env kind-env type-env (× type ...))]
-  [(kind-of sort-env kind-env type-env type)
-   (sort-of sort-env kind-env type-env idx Shape)
+   (kind-of sort-env kind-env (× type ...))]
+  [(kind-of sort-env kind-env type)
+   (sort-of sort-env idx Shape)
    ---
-   (kind-of sort-env kind-env type-env (Array idx type))]
-  [(kind-of sort-env (kind-env-update [var ★] ... kind-env) type-env type)
+   (kind-of sort-env kind-env (Array idx type))]
+  [(kind-of sort-env (kind-env-update [var ★] ... kind-env) type)
    ---
-   (kind-of sort-env kind-env type-env (∀ [var ...] type))])
+   (kind-of sort-env kind-env (∀ [var ...] type))])
 
 
 
@@ -1053,38 +1048,38 @@
  ; type and index well-formedness
  ;-------------------
  (check-true
-  (judgment-holds (kind-of [] [] [] (Array (S 4 3) Num))))
+  (judgment-holds (kind-of [] [] (Array (S 4 3) Num))))
  (check-true
-  (judgment-holds (kind-of [] [] [] ((Array (S 4 3) Num) -> Bool))))
+  (judgment-holds (kind-of [] [] ((Array (S 4 3) Num) -> Bool))))
  (check-true
-  (judgment-holds (kind-of ([sh Shape]) [] [] ((Array sh Num) -> Bool))))
+  (judgment-holds (kind-of ([sh Shape]) [] ((Array sh Num) -> Bool))))
  (check-true
-  (judgment-holds (kind-of ([sh Shape]) [] [] (× (Array sh Num) Bool))))
+  (judgment-holds (kind-of ([sh Shape]) [] (× (Array sh Num) Bool))))
  (check-true
-  (judgment-holds (kind-of ([sh Shape]) [] [] (Array sh (× Num Bool)))))
+  (judgment-holds (kind-of ([sh Shape]) [] (Array sh (× Num Bool)))))
  (check-true
-  (judgment-holds (kind-of [] [] [] (Π ([sh Shape]) ((Array sh Num) -> Bool)))))
+  (judgment-holds (kind-of [] [] (Π ([sh Shape]) ((Array sh Num) -> Bool)))))
  (check-true
-  (judgment-holds (kind-of [] [] []
+  (judgment-holds (kind-of [] []
                            (Π ([sh Shape]) ((Array sh Num) -> Bool)))))
  (check-true
-  (judgment-holds (kind-of [] [] []
+  (judgment-holds (kind-of [] []
                            (Π ([len Nat]) ((Array (S 3 len 2) Num) -> Bool)))))
  (check-true
-  (judgment-holds (kind-of [] [] []
+  (judgment-holds (kind-of [] []
                            (∀ (elt)
                               (Π ([fr Shape])
                                  ((Array fr elt) -> (Array fr elt)))))))
  ; can tell by position whether a variable indicates a type or an index
  (check-true
-  (judgment-holds (kind-of [(x Shape)] [(x ★)] []
+  (judgment-holds (kind-of [(x Shape)] [(x ★)]
                            (Array x x))))
  ; free index variable
  (check-false
-  (judgment-holds (kind-of [] [] [] (Array sh Num))))
+  (judgment-holds (kind-of [] [] (Array sh Num))))
  ; free type variable
  (check-false
-  (judgment-holds (kind-of [] [] [] (Array (S) elt))))
+  (judgment-holds (kind-of [] [] (Array (S) elt))))
  
  
  
