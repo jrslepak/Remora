@@ -15,9 +15,11 @@
         ; type application
         (T-APP expr type ...)
         ; construction of dependent sum
-        (SUM idx ... expr type)
+        (PACK idx ... expr type)
         ; can only get the abstracted thing -- the witness is an index
         (Σ-PROJ expr)
+        ; let-like binding to destruct a dependent sum
+        (UNPACK ([var ... var] ⇐ expr) expr)
         ; index abstraction
         (I-λ [(var sort) ...] expr)
         ; index application
@@ -36,7 +38,7 @@
      (T-APP E type ...)
      (I-APP E idx ...)
      (Σ-PROJ E)
-     (SUM idx ... E type))
+     (PACK idx ... E type))
   
   ; type-level pieces
   (type (Π [(var sort) ...] type)
@@ -169,10 +171,17 @@
             (Array idx_prod (index/type-sub ([var idx_arg] ...) type)))]
   
   ; projection from dependent sum
-  [(type-of sort-env kind-env type-env expr (Σ [(var sort) ...] type))
+  [(type-of sort-env kind-env type-env
+            expr_sum (Σ [(var_witness sort_witness) ...] type_contents))
+   (type-of (sort-env-update [var_witness sort_witness] ... sort-env)
+            kind-env
+            (type-env-update [var_contents type_contents] type-env)
+            expr_body type_body)
+   (kind-of sort-env kind-env type_body)
    ---
-   (type-of sort-env kind-env type-env (Σ-PROJ expr)
-            (index/type-sub [(var (Σ-WITNESS var expr))...] type))]
+   (type-of sort-env kind-env type-env
+            (UNPACK ([var_witness ... var_contents] ⇐ expr_sum) expr_body)
+            type_body)]
   
   ; creation of dependent sum
   [(sort-of sort-env idx sort) ...
@@ -183,9 +192,8 @@
    ;(where type_0 (canonicalize-type type))
    ---
    (type-of sort-env kind-env type-env
-            (SUM idx ... expr (Σ [(var sort) ...] type))
-            (Σ [(var sort) ...] type))]
-  )
+            (PACK idx ... expr (Σ [(var sort) ...] type))
+            (Σ [(var sort) ...] type))])
 
 (define-judgment-form Dependent
   #:contract (sort-of sort-env idx sort)
@@ -459,10 +467,10 @@
    ((index/expr-sub idx-env expr_fun)
     (index/expr-sub idx-env idx_arg) ...)]
   ; dependent sums
-  [(index/expr-sub idx-env (SUM idx ... expr type))
-   (SUM (index/index-sub idx-env idx) ...
-        (index/expr-sub idx-env expr)
-        (index/type-sub idx-env type))]
+  [(index/expr-sub idx-env (PACK idx ... expr type))
+   (PACK (index/index-sub idx-env idx) ...
+         (index/expr-sub idx-env expr)
+         (index/type-sub idx-env type))]
   [(index/expr-sub idx-env (Σ-PROJ expr))
    (Σ-PROJ (index/expr-sub idx-env expr))])
 
@@ -528,10 +536,10 @@
    (I-APP (type/expr-sub type-env expr)
           (type/index-sub type-env idx) ...)]
   ; dependent sums
-  [(type/expr-sub type-env (SUM idx ... expr type))
-   (SUM (type/index-sub type-env idx) ...
-        (type/expr-sub type-env expr)
-        (type/type-sub type-env type))]
+  [(type/expr-sub type-env (PACK idx ... expr type))
+   (PACK (type/index-sub type-env idx) ...
+         (type/expr-sub type-env expr)
+         (type/type-sub type-env type))]
   [(type/expr-sub type-env (Σ-PROJ expr))
    (Σ-PROJ (type/expr-sub type-env expr))])
 
@@ -600,10 +608,10 @@
    (I-APP (expr/expr-sub expr-env expr_fun)
           (expr/idx-sub expr-env idx_arg) ...)]
   ; dependent sums
-  [(expr/expr-sub expr-env (SUM idx ... expr type))
-   (SUM (expr/idx-sub expr-env idx) ...
-        (expr/expr-sub expr-env expr)
-        (expr/type-sub expr-env type))]
+  [(expr/expr-sub expr-env (PACK idx ... expr type))
+   (PACK (expr/idx-sub expr-env idx) ...
+         (expr/expr-sub expr-env expr)
+         (expr/type-sub expr-env type))]
   [(expr/expr-sub expr-env (Σ-PROJ expr))
    (Σ-PROJ (expr/expr-sub expr-env expr))])
 
@@ -967,19 +975,21 @@
  ; projection from a dependent sum
  (check-equal?
   (judgment-holds
-   (type-of [] [] [(x (Σ [(d1 Nat) (d2 Nat)] (Array (S d1 3 d2) Num)))]
-            (Σ-PROJ x) type) type)
-  (term ((Array (S (Σ-WITNESS d1 x) 3 (Σ-WITNESS d2 x)) Num))))
+   (type-of [] [] [] (UNPACK ([l c] ⇐
+                                    (PACK 3 (A [3] [1 2 3])
+                                          (Σ [(l Nat)] (Array (S l) Num))))
+                             (A [] [0])) type)
+   type)
+  (term ((Array (S) Num))))
  
  ; creation of a dependent sum
  (check-equal?
   (judgment-holds
    (type-of [][][]
-            (SUM 3 (A (3) (0 1 2)) (Σ [(d Nat)] (Array (S d) Num)))
+            (PACK 3 (A (3) (0 1 2)) (Σ [(d Nat)] (Array (S d) Num)))
             type)
    type)
   (term ((Σ [(d Nat)] (Array (S d) Num)))))
- ; (projection from a hand-made dependent sum is really a run-time issue)
  
  ; typing compose makes use of typechecker code for handling abstracted indices
  (check-equal?
