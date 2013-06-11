@@ -10,7 +10,7 @@
   (expr (expr expr ...) ; include bits from untyped language, but not boxing
         arr
         var
-        ; type abstraction (or should this be at `fun' level?)
+        ; type abstraction
         (T-λ [var ...] expr)
         ; type application
         (T-APP expr type ...)
@@ -59,14 +59,7 @@
         Shape)
   (idx natural
        (S idx ...)
-       ; sort-level computation to determine output shape
-       ; handled via metafunction once actual indices known
-       ; we require [shape naturalized-rank] pairs
-       ; TODO: probably going to need more operations on shapes eventually
-       ; addition, multiplication?
        (PLUS idx idx)
-       ; extract the `var' witness from dependent sum
-       (Σ-WITNESS var expr)
        var)
   
   ; extra machinery for type checking and substitution purposes
@@ -305,9 +298,7 @@
    (Array idx_1 (Array idx_2 hole))]
   [(frame-contribution (Array (S idx_0 ...) type)
                        (Array (S idx_0 ... idx_1 ...) type))
-   (Array (S idx_1 ...) hole)]
-  [(frame-contribution (Array (Σ-WITNESS var expr) type))
-   (Array (Σ-WITNESS var expr) hole)])
+   (Array (S idx_1 ...) hole)])
 
 ; find the frame-struct that is prefixed by all other frame-structs in the list
 ; this is essentially a left fold with larger-frame
@@ -506,9 +497,7 @@
   [(index/index-sub idx-env natural) natural]
   [(index/index-sub idx-env (S idx ...)) (S (index/index-sub idx-env idx) ...)]
   [(index/index-sub idx-env (PLUS idx_0 idx_1))
-   (PLUS (index-sub idx-env idx_0) (index-sub idx-env idx_1))]
-  [(index/index-sub idx-env (Σ-WITNESS var expr))
-   (Σ-WITNESS (index/index-sub idx-env var) (index/index-sub idx-env expr))])
+   (PLUS (index-sub idx-env idx_0) (index-sub idx-env idx_1))])
 
 ; substitute types into an (element) expression
 (define-metafunction Dependent
@@ -577,9 +566,7 @@
   [(type/index-sub type-env (S idx ...))
    (S (type/index-sub type-env idx) ...)]
   [(type/index-sub type-env (PLUS idx_0 idx_1))
-   (PLUS (type/index-sub type-env idx_0) (type/index-sub type-env idx_1))]
-  [(type/index-sub type-env (Σ-WITNESS var expr))
-   (Σ-WITNESS var (type/expr-sub type-env expr))])
+   (PLUS (type/index-sub type-env idx_0) (type/index-sub type-env idx_1))])
 
 ; substitute (element) expressions into an (element) expression
 (define-metafunction Dependent
@@ -647,9 +634,7 @@
   [(expr/index-sub expr-env (S idx ...))
    (S (expr/index-sub expr-env idx) ...)]
   [(expr/index-sub expr-env (PLUS idx_0 idx_1))
-   (PLUS (expr/index-sub expr-env idx_0) (expr/index-sub expr-env idx_1))]
-  [(expr/index-sub expr-env (Σ-WITNESS var expr))
-   (Σ-WITNESS var (expr/index-sub expr-env expr))])
+   (PLUS (expr/index-sub expr-env idx_0) (expr/index-sub expr-env idx_1))])
 
 
 ; reduce a type to canonical form:
