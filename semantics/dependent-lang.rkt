@@ -25,6 +25,10 @@
         ; index application
         (I-APP expr idx ...))
   
+  (arr ....
+       ; allow a type annotation
+       (A type (num ...) (el-expr ...)))
+  
   ; for array syntax, already-present shape vector works as constructor index
   ; allow arrays of types and sorts? or are arrays strictly value-level?
   
@@ -87,19 +91,31 @@
 (define-judgment-form Dependent
   #:contract (type-of sort-env kind-env type-env el-expr type)
   #:mode (type-of I I I I O)
+  ; base data
+  [(type-of sort-env kind-env type-env num Num)]
+  [(type-of sort-env kind-env type-env bool Bool)]
   ; array: find element type, check for correct number of elements
   [(type-of/elts sort-env kind-env type-env (el-expr ...) type)
+   ; would prefer `(type-of sort-env kind-env type-env el-expr type) ...' here,
+   ; but Redex doesn't realize there must be exactly one `type' (causing an
+   ; ellipsis mismatch)
    (side-condition (size-check (A (natural ...) (el-expr ...))))
    --- array
    (type-of sort-env kind-env type-env
             (A (natural ...) (el-expr ...))
             (Array (S natural ...) type))]
+  [(check-elts sort-env kind-env type-env (el-expr ...) type)
+   (side-condition (size-check (A (natural ...) (el-expr ...))))
+   --- array-annotated
+   (type-of sort-env kind-env type-env
+            (A type (natural ...) (el-expr ...))
+            (Array (S natural ...) type))]
   ; variable: grab from environment (not there -> ill-typed)
   [; should probably change this to have premise which calls type env lookup
    --- variable
-       (type-of sort-env kind-env
-                ([var_0 type_0] ... [var_1 type_1] [var_2 type_2] ...)
-                var_1 type_1)]
+   (type-of sort-env kind-env
+            ([var_0 type_0] ... [var_1 type_1] [var_2 type_2] ...)
+            var_1 type_1)]
   ; primitive operator: call out to metafunction
   [(where type (primop-type op))
    --- operator
@@ -250,8 +266,6 @@
 (define-judgment-form Dependent
   #:contract (type-of/elts sort-env kind-env type-env (el-expr ...) type)
   #:mode (type-of/elts I I I I O)
-  ; TODO: empty arrays will need either annotation or special casing
-  ; as it stands now, they check as empty arrays of base type
   [(type-of sort-env kind-env type-env el-expr_0 type_0)
    (type-of sort-env kind-env type-env el-expr_1 type_1) ...
    (side-condition (term (all-equal? [(canonicalize-type type_0)
@@ -261,10 +275,20 @@
   ; simple cases are base types (this is the only place where raw base-typed
   ; values can appear)
   [--- num-elt
-       (type-of/elts sort-env kind-env type-env (num ...) Num)]
+       (type-of/elts sort-env kind-env type-env (num_0 num_1 ...) Num)]
   [--- bool-elt
-       (type-of/elts sort-env kind-env type-env (bool ...) Bool)])
+       (type-of/elts sort-env kind-env type-env (bool_0 bool_1 ...) Bool)])
 
+; separate judgment needed for checking array element types
+; they must all have a type equivalent to the specified type
+(define-judgment-form Dependent
+  #:contract (check-elts sort-env kind-env type-env (el-expr ...) type)
+  #:mode (check-elts I I I I I)
+  [(type-of sort-env kind-env type-env el-expr type_derived) ...
+   (side-condition (term (all-equal? [(canonicalize-type type_annotated)
+                                      (canonicalize-type type_derived) ...])))
+   --- non-base-elt
+   (check-elts sort-env kind-env type-env (el-expr ...) type_annotated)])
 
 ; check whether an array has as many elements as its shape says it should have
 (define-metafunction Dependent
@@ -840,6 +864,15 @@
                                type)
                (term ((Array (S 2) Bool))))
  
+ ; annotated array
+ (check-equal? (judgment-holds (type-of () () () (A Bool [2] [#f #t]) type)
+                               type)
+               (term ((Array (S 2) Bool))))
+ ; empty array
+ (check-equal? (judgment-holds (type-of () () () (A Bool [0 2] []) type)
+                               type)
+               (term ((Array (S 0 2) Bool))))
+ 
  ; array with wrong number of elements
  (check-equal? (judgment-holds (type-of () () () (A (3 2) (4 1 6 2 3)) type)
                                type)
@@ -938,8 +971,6 @@
   (term ((Array (S) ((Array (S) Bool) -> (Array (S) Bool))))))
  
  ; index application
- ; TODO: find some other function to use, as +'s type is now scalar->scalar
- ; append is probably a good one (for now, just stick something in environment)
  (check-equal?
   (judgment-holds
    (type-of [] [] [(op (Π ([d1 Nat]) ((Array (S d1) Num)
