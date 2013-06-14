@@ -16,8 +16,6 @@
         (T-APP expr type ...)
         ; construction of dependent sum
         (PACK idx ... expr type)
-        ; can only get the abstracted thing -- the witness is an index
-        (Σ-PROJ expr)
         ; let-like binding to destruct a dependent sum
         (UNPACK ([var ... var] ⇐ expr) expr)
         ; index abstraction
@@ -36,13 +34,6 @@
   (fun (λ [(var type) ...] expr)
        op
        c-op)
-  
-  ; evaluation contexts -- need typed semantics to show type erasure "works"
-  (E ....
-     (T-APP E type ...)
-     (I-APP E idx ...)
-     (Σ-PROJ E)
-     (PACK idx ... E type))
   
   ; type-level pieces
   (type (Π [(var sort) ...] type)
@@ -296,24 +287,6 @@
   [(size-check (A (num ...) (el-expr ...))) ,(= (foldr * 1 (term (num ...)))
                                                 (length (term (el-expr ...))))])
 
-; determine the frame shape associated with a lifting instance
-; TODO: metafunctions used by f'n app type rule probably make this superfluous
-;  right now, only canonicalize-index uses this, and only for handling
-;  the `frame' index-level computation form
-; TODO: check for prefix agreement
-(define-metafunction Dependent
-  frame-shape : (natural ...) (idx ...) -> idx
-  [(frame-shape (natural_rank ...) (idx ...))
-   (S idx_frame-dim ...)
-   
-   ; how overranked is each term?
-   (where (natural_over ...)
-          ((-/m (shape->rank idx) natural_rank) ...))
-   ; position of highest overrank?
-   (where (natural_overrank (S idx_dim ...))
-          ,(argmax first (term ([natural_over idx] ...))))
-   ; extract prefix
-   (where (idx_frame-dim ...) (take/m (idx_dim ...) natural_overrank))])
 
 ; identify what an argument's expected and actual types require
 ; as a prefix of the function application frame
@@ -495,8 +468,10 @@
    (PACK (index/index-sub idx-env idx) ...
          (index/expr-sub idx-env expr)
          (index/type-sub idx-env type))]
-  [(index/expr-sub idx-env (Σ-PROJ expr))
-   (Σ-PROJ (index/expr-sub idx-env expr))])
+  [(index/expr-sub idx-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum) expr_body))
+   (UNPACK ([var_wit ... var_cont] ⇐ (index/expr-sub idx-env expr_sum))
+           (index/expr-sub idx-env_shadowed expr_body))
+   (where idx-env_shadowed (shadow (var_wit ...) idx-env))])
 
 ; substitute indices into a type
 (define-metafunction Dependent
@@ -564,8 +539,9 @@
    (PACK (type/index-sub type-env idx) ...
          (type/expr-sub type-env expr)
          (type/type-sub type-env type))]
-  [(type/expr-sub type-env (Σ-PROJ expr))
-   (Σ-PROJ (type/expr-sub type-env expr))])
+  [(type/expr-sub type-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum) expr_body))
+   (UNPACK ([var_wit ... var_cont] ⇐ (type/expr-sub type-env expr_sum))
+           (type/expr-sub type-env expr_body))])
 
 ; substitute types into a type
 (define-metafunction Dependent
@@ -636,8 +612,10 @@
    (PACK (expr/idx-sub expr-env idx) ...
          (expr/expr-sub expr-env expr)
          (expr/type-sub expr-env type))]
-  [(expr/expr-sub expr-env (Σ-PROJ expr))
-   (Σ-PROJ (expr/expr-sub expr-env expr))])
+  [(expr/expr-sub expr-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum) expr_body))
+   (UNPACK ([var_wit ... var_cont] ⇐ (expr/expr-sub expr-env expr_sum))
+           (expr/expr-sub expr-env_shadowed expr_body))
+   (where expr-env_shadowed (shadow (var_cont) expr-env))])
 
 ; substitute expressions into a type
 (define-metafunction Dependent
