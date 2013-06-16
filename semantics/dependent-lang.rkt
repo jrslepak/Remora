@@ -3,6 +3,8 @@
 (require rackunit
          redex
          "language.rkt")
+(provide Dependent
+         type-of kind-of sort-of)
 
 (define-extended-language Dependent Arrays
   ; may also want to add a type annotation to array syntax
