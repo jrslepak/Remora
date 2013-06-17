@@ -5,21 +5,25 @@
 
 (define-extended-language Annotated Dependent
   ; fully-annotated expression forms
-  (ann-expr (ann-expr ann-expr ... : type)
-            ann-arr
-            ann-var
-            (T-λ [var ...] ann-expr : type)
-            (T-APP ann-expr type ... : type)
-            (PACK idx ... ann-expr : type)
-            (UNPACK ([var ... var] ⇐ ann-expr) ann-expr : type)
-            (I-λ [(var sort) ...] ann-expr : type)
-            (I-APP ann-expr idx ... : type))
+  (expr/t (expr/t expr/t ... : type)
+            var/t
+            arr/t
+            (T-λ [var ...] expr/t : type)
+            (T-APP expr/t type ... : type)
+            (PACK idx ... expr/t : type)
+            (UNPACK ([var ... var] ⇐ expr/t) expr/t : type)
+            (I-λ [(var sort) ...] expr/t : type)
+            (I-APP expr/t idx ... : type))
   ; add type annotation to variable/array
-  (ann-var (var : type))
+  (var/t (var : type))
   ; 1st type (if present) describes el-exprs
   ; 2nd type describes entire array
-  (ann-arr (A type (num ...) (el-expr ...) : type)
-           (A (num ...) (el-expr ...) : type)))
+  (arr/t (A type (num ...) (el-expr/t ...) : type)
+         (A (num ...) (el-expr/t ...) : type))
+  (el-expr/t base
+             fun/t)
+  (fun/t op
+         (λ [(var type) ...] expr/t : type)))
 
 ; use type-of judgment to identify the unique type that matches a given expr
 (define-metafunction Dependent
