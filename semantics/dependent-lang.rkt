@@ -4,7 +4,8 @@
          redex
          "language.rkt")
 (provide Dependent
-         type-of kind-of sort-of)
+         type-of kind-of sort-of
+         canonicalize-type)
 
 (define-extended-language Dependent Arrays
   ; may also want to add a type annotation to array syntax

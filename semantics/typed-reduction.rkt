@@ -20,7 +20,8 @@
   ; 2nd type describes entire array
   (arr/t (A type (num ...) (el-expr/t ...) : type)
          (A (num ...) (el-expr/t ...) : type))
-  (el-expr/t base
+  (el-expr/t expr/t
+             base
              fun/t)
   (fun/t op
          (λ [(var type) ...] expr/t : type)))
@@ -50,3 +51,99 @@
           ,(judgment-holds (sort-of sort-env idx type)
                            type))]
   [(unique-sort-of sort-env idx) #f])
+
+; drop type annotations to convert from expr/t to expr
+; assumes the expr/t is actually well-typed
+(define-metafunction Annotated
+  type-erase : el-expr/t -> el-expr
+  [(type-erase (expr/t_fun expr/t_arg ... : type))
+   ((type-erase expr/t_fun) (type-erase expr/t_arg) ...)]
+  [(type-erase (var : type)) var]
+  
+  [(type-erase (A type_elt (num ...) (el-expr/t ...) : type_arr))
+   (A type_elt (num ...) ((type-erase el-expr/t) ...))]
+  [(type-erase (A (num ...) (el-expr/t_0 el-expr/t_1 ...) : type_arr))
+   (A (num ...) ((type-erase el-expr/t_0) (type-erase el-expr/t_1) ...))]
+  ; if the array has no elements, we must identify the element type and
+  ; put an element annotation for it
+  [(type-erase (A (num ...) (el-expr/t ...) : type))
+   (A type_elt (num ...) ((type-erase el-expr/t) ...))
+   (where (Array (S num ... num_extras ...) type_atom) (canonicalize-type type))
+   (where type_elt (canonicalize-type (Array (S num_extras ...) type_atom)))]
+  
+  [(type-erase (T-λ [var ...] expr/t : type))
+   (T-λ [var ...] (type-erase expr/t))]
+  [(type-erase (T-APP expr/t type_arg ... : type))
+   (T-APP (type-erase expr/t) type_arg ...)]
+  
+  [(type-erase (PACK idx ... expr/t : type))
+   (PACK idx ... (type-erase expr/t) type)]
+  [(type-erase (UNPACK ([var_witness ... var_contents] ⇐ expr/t_sum)
+                       expr/t_body : type))
+   (UNPACK ([var_witness ... var_contents] ⇐ (type-erase expr/t_sum))
+           (type-erase expr/t_body))]
+  
+  [(type-erase (I-λ [(var sort) ...] expr/t : type))
+   (I-λ [(var sort) ...] (type-erase expr/t))]
+  [(type-erase (I-APP expr/t idx ... : type))
+   (I-APP (type-erase expr/t) idx ...)]
+  
+  [(type-erase (λ [(var type_arg) ...] expr/t : type_fun))
+   (λ [(var type_arg) ...] (type-erase expr/t))]
+  [(type-erase op) op]
+  [(type-erase base) base])
+
+(module+
+ test
+ (require rackunit)
+ 
+ (check-equal?
+  (term (type-erase (A (3) [(A (2) [1 2] : (Array (S 2) Num))
+                            (A (2) [3 4] : (Array (S 2) Num))
+                            (A (2) [5 6] : (Array (S 2) Num))]
+                       : (Array (S 3) (Array (S 2) Num)))))
+  (term (A [3] [(A [2] [1 2])
+                (A [2] [3 4])
+                (A [2] [5 6])])))
+ 
+ (check-equal?
+  (term
+   (type-erase
+    (I-λ [(s1 Shape) (s2 Shape) (s3 Shape)]
+         (T-λ [α β γ]
+              (A [] [(λ [(f (Array (S) ((Array s1 α) -> (Array s2 β))))
+                         (g (Array (S) ((Array s2 β) -> (Array s3 γ))))]
+                       (A [] [(λ [(x (Array s1 α))]
+                                ([g : (Array (S) ((Array s2 β)
+                                                  -> (Array s3 γ)))]
+                                 ([f : (Array (S) ((Array s1 α)
+                                                   -> (Array s2 β)))]
+                                  [x : (Array s1 α)]
+                                  : (Array s2 β))
+                                 : (Array s3 γ))
+                                : ((Array s1 α) -> (Array s3 γ)))]
+                          : (Array (S) ((Array s1 α) -> (Array s3 γ))))
+                       : ((Array (S) ((Array s1 α) -> (Array s2 β)))
+                          (Array (S) ((Array s2 β) -> (Array s3 γ)))
+                          -> (Array (S) ((Array s1 α) -> (Array s3 γ)))))]
+                 : (Array (S)
+                          ((Array (S) ((Array s1 α) -> (Array s2 β)))
+                           (Array (S) ((Array s2 β) -> (Array s3 γ)))
+                           -> (Array (S) ((Array s1 α) -> (Array s3 γ))))))
+              : (∀ [α β γ]
+                   (Array (S)
+                          ((Array (S) ((Array s1 α) -> (Array s2 β)))
+                           (Array (S) ((Array s2 β) -> (Array s3 γ)))
+                           -> (Array (S) ((Array s1 α) -> (Array s3 γ)))))))
+         : (Π [(s1 Shape) (s2 Shape) (s3 Shape)]
+              (∀ [α β γ]
+                 (Array (S)
+                        ((Array (S) ((Array s1 α) -> (Array s2 β)))
+                         (Array (S) ((Array s2 β) -> (Array s3 γ)))
+                         -> (Array (S) ((Array s1 α) -> (Array s3 γ))))))))))
+  (term (I-λ [(s1 Shape) (s2 Shape) (s3 Shape)]
+             (T-λ [α β γ]
+                  (A [] [(λ [(f (Array (S) ((Array s1 α) -> (Array s2 β))))
+                             (g (Array (S) ((Array s2 β) -> (Array s3 γ))))]
+                           (A [] [(λ [(x (Array s1 α))]
+                                    (g (f x)))]))]))))))
