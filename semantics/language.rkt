@@ -2,7 +2,8 @@
 
 (require redex)
 (provide Arrays ->Array
-         take/m drop/m take-right/m drop-right/m prefix?
+         take/m drop/m take-right/m drop-right/m prefix? all
+         apply-op
          shape)
 
 (define-language Arrays

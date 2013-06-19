@@ -1,7 +1,9 @@
 #lang racket
 
 (require redex
-         "dependent-lang.rkt")
+         "dependent-lang.rkt"
+         "language.rkt"
+         "redex-utils.rkt")
 
 (define-extended-language Annotated Dependent
   ; fully-annotated expression forms
@@ -23,8 +25,33 @@
   (el-expr/t expr/t
              base
              fun/t)
+  (elt/t base
+         fun/t)
   (fun/t op
-         (λ [(var type) ...] expr/t : type)))
+         (λ [(var type) ...] expr/t : type))
+  
+  (val/t elt/t
+         (A (num ...) (elt/t ...) : type)
+         (PACK idx ... val/t : type))
+  
+  (E hole
+     (E expr/t ... : type)
+     (val/t ... E expr/t ... : type)
+     (A (num ...) (val/t ... E el-expr/t ...) : type)
+     (PACK idx ... E : type)
+     (UNPACK ([var ... var] ⇐ E) expr/t : type)))
+
+(define ->Typed
+  (reduction-relation
+   Annotated
+   #:domain expr/t
+   [--> (in-hole E ((A [] [op] : (Array (S) (type_arg ... -> type_ret)))
+                    val/t ... : type_e))
+        (in-hole E (annotate/cl (apply-op op [(type-erase val/t) ...])))
+        (where (type_arg/canon ...) ((canonicalize-type type_arg) ...))
+        (where (type_val/canon ...)
+               ((canonicalize-type (extract-annotation val/t)) ...))
+        op]))
 
 ; use type-of judgment to identify the unique type that matches a given expr
 (define-metafunction Dependent
@@ -109,6 +136,10 @@
                                (λ [(var type_arg) ...] expr)))]
   [(annotate sort-env kind-env type-env op) op]
   [(annotate sort-env kind-env type-env base) base])
+; specialized version for closed terms
+(define-metafunction Annotated
+  annotate/cl : el-expr -> el-expr/t
+  [(annotate/cl el-expr) (annotate [] [] [] el-expr)])
 
 ; drop type annotations to convert from expr/t to expr
 ; assumes the expr/t is actually well-typed
@@ -151,9 +182,33 @@
   [(type-erase op) op]
   [(type-erase base) base])
 
+; extract an el-expr/t's type
+(define-metafunction Annotated
+  extract-annotation : el-expr/t -> type
+  [(extract-annotation (any ... : type)) type])
+
 (module+
  test
  (require rackunit)
+ 
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl ((A [] [+]) (A [] [1]) (A [] [1])))))
+  (term (A [] [2] : (Array (S) Num))))
+ 
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl ((A [] [+]) (A [] [1])
+                                  ((A [] [+]) (A [] [1]) (A [] [1]))))))
+  (term (A [] [3] : (Array (S) Num))))
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl ((A [] [+]) ((A [] [+]) (A [] [1]) (A [] [1]))
+                                  (A [] [1])))))
+  (term (A [] [3] : (Array (S) Num))))
  
  (check-equal?
   (term (annotate [][][] ((A [] [+]) (A Num [2] [1 3]) (A [] [4]))))
