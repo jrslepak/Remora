@@ -5,6 +5,7 @@
          "language.rkt")
 (provide Dependent
          type-of kind-of sort-of
+         type-env-update kind-env-update sort-env-update
          canonicalize-type)
 
 (define-extended-language Dependent Arrays
