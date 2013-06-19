@@ -5,6 +5,7 @@
          "language.rkt")
 (provide Dependent
          type-of kind-of sort-of
+         type-env-update kind-env-update sort-env-update
          canonicalize-type)
 
 (define-extended-language Dependent Arrays
@@ -471,7 +472,8 @@
    (PACK (index/index-sub idx-env idx) ...
          (index/expr-sub idx-env expr)
          (index/type-sub idx-env type))]
-  [(index/expr-sub idx-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum) expr_body))
+  [(index/expr-sub idx-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum)
+                                   expr_body))
    (UNPACK ([var_wit ... var_cont] ⇐ (index/expr-sub idx-env expr_sum))
            (index/expr-sub idx-env_shadowed expr_body))
    (where idx-env_shadowed (shadow (var_wit ...) idx-env))])
@@ -542,7 +544,8 @@
    (PACK (type/index-sub type-env idx) ...
          (type/expr-sub type-env expr)
          (type/type-sub type-env type))]
-  [(type/expr-sub type-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum) expr_body))
+  [(type/expr-sub type-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum)
+                                   expr_body))
    (UNPACK ([var_wit ... var_cont] ⇐ (type/expr-sub type-env expr_sum))
            (type/expr-sub type-env expr_body))])
 
@@ -615,7 +618,8 @@
    (PACK (expr/idx-sub expr-env idx) ...
          (expr/expr-sub expr-env expr)
          (expr/type-sub expr-env type))]
-  [(expr/expr-sub expr-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum) expr_body))
+  [(expr/expr-sub expr-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum)
+                                   expr_body))
    (UNPACK ([var_wit ... var_cont] ⇐ (expr/expr-sub expr-env expr_sum))
            (expr/expr-sub expr-env_shadowed expr_body))
    (where expr-env_shadowed (shadow (var_cont) expr-env))])

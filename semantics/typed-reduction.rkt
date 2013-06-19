@@ -40,7 +40,8 @@
 ; use kind-of judgment to determine whether a given type is well-formed
 (define-metafunction Dependent
   well-kinded : sort-env kind-env type -> bool
-  [(well-kinded sort-env el-expr) ,(judgment-holds (sort-of sort-env idx type))])
+  [(well-kinded sort-env el-expr)
+   ,(judgment-holds (sort-of sort-env idx type))])
 
 ; use sort-of judgment to identify the unique sort that matches a given idx
 (define-metafunction Dependent
@@ -51,6 +52,63 @@
           ,(judgment-holds (sort-of sort-env idx type)
                            type))]
   [(unique-sort-of sort-env idx) #f])
+
+; add type annotations to convert from expr to expr/t
+; assumes the expr is actually well-typed
+; annotating the body of an abstraction requires looking up the vars it binds
+(define-metafunction Annotated
+  annotate : sort-env kind-env type-env el-expr -> el-expr/t
+  [(annotate sort-env kind-env type-env (expr_fun expr_arg ...))
+   ((annotate sort-env kind-env type-env expr_fun)
+    (annotate sort-env kind-env type-env expr_arg) ... : type)
+   (where type (unique-type-of sort-env kind-env type-env
+                               (expr_fun expr_arg ...)))]
+  [(annotate sort-env kind-env type-env var)
+   (var : type)
+   (where type (unique-type-of sort-env kind-env type-env var))]
+  
+  [(annotate sort-env kind-env type-env (A (num ...) (el-expr ...)))
+   (A (num ...) ((annotate sort-env kind-env type-env el-expr) ...) : type)
+   (where type (unique-type-of sort-env kind-env type-env
+                               (A (num ...) (el-expr ...))))]
+  [(annotate sort-env kind-env type-env (A type_elt (num ...) (el-expr ...)))
+   (A (num ...) ((annotate sort-env kind-env type-env el-expr) ...) : type)
+   (where type (unique-type-of sort-env kind-env type-env
+                               (A type_elt (num ...) (el-expr ...))))]
+  
+  [(annotate sort-env kind-env type-env (T-λ [var ...] expr))
+   (T-λ [var ...] (annotate sort-env
+                            (kind-env-update [var ★] ... kind-env)
+                            type-env
+                            expr) : type)
+   (where type (unique-type-of sort-env kind-env type-env
+                               (T-λ [var ...] expr)))]
+  [(annotate sort-env kind-env type-env (T-APP expr type_arg ...))
+   (T-APP (annotate sort-env kind-env type-env expr) type_arg ... : type)
+   (where type (unique-type-of sort-env kind-env type-env
+                               (T-APP expr type_arg ...)))]
+  
+  [(annotate sort-env kind-env type-env (I-λ [(var sort) ...] expr))
+   (I-λ [(var sort) ...]
+        (annotate (sort-env-update (var sort) ... sort-env)
+                  kind-env type-env
+                  expr) : type)
+   (where type (unique-type-of sort-env kind-env type-env
+                               (I-λ [(var sort) ...] expr)))]
+  [(annotate sort-env kind-env type-env (I-APP expr idx ...))
+   (I-APP (annotate sort-env kind-env type-env expr) idx ... : type)
+   (where type (unique-type-of sort-env kind-env type-env
+                               (I-APP expr idx ...)))]
+  
+  [(annotate sort-env kind-env type-env (λ [(var type_arg) ...] expr))
+   (λ [(var type_arg) ...]
+     (annotate sort-env kind-env
+               (type-env-update (var type_arg) ... type-env)
+               expr) : type)
+   (where type (unique-type-of sort-env kind-env type-env
+                               (λ [(var type_arg) ...] expr)))]
+  [(annotate sort-env kind-env type-env op) op]
+  [(annotate sort-env kind-env type-env base) base])
 
 ; drop type annotations to convert from expr/t to expr
 ; assumes the expr/t is actually well-typed
@@ -96,6 +154,56 @@
 (module+
  test
  (require rackunit)
+ 
+ (check-equal?
+  (term (annotate [][][] ((A [] [+]) (A Num [2] [1 3]) (A [] [4]))))
+  (term ((A [] [+] : (Array (S) ((Array (S) Num)
+                                 (Array (S) Num)
+                                 -> (Array (S) Num))))
+         (A [2] [1 3] : (Array (S 2) Num))
+         (A [] [4]: (Array (S) Num))
+         : (Array (S 2) Num))))
+ 
+ (check-equal?
+  (term (annotate
+         [][][]
+         (I-λ [(s1 Shape) (s2 Shape) (s3 Shape)]
+              (T-λ [α β γ]
+                   (A [] [(λ [(f (Array (S) ((Array s1 α) -> (Array s2 β))))
+                              (g (Array (S) ((Array s2 β) -> (Array s3 γ))))]
+                            (A [] [(λ [(x (Array s1 α))] (g (f x)))]))])))))
+ (term (I-λ [(s1 Shape) (s2 Shape) (s3 Shape)]
+            (T-λ [α β γ]
+                 (A [] [(λ [(f (Array (S) ((Array s1 α) -> (Array s2 β))))
+                            (g (Array (S) ((Array s2 β) -> (Array s3 γ))))]
+                          (A [] [(λ [(x (Array s1 α))]
+                                   ([g : (Array (S) ((Array s2 β)
+                                                     -> (Array s3 γ)))]
+                                    ([f : (Array (S) ((Array s1 α)
+                                                      -> (Array s2 β)))]
+                                     [x : (Array s1 α)]
+                                     : (Array s2 β))
+                                    : (Array s3 γ))
+                                   : ((Array s1 α) -> (Array s3 γ)))]
+                             : (Array (S) ((Array s1 α) -> (Array s3 γ))))
+                          : ((Array (S) ((Array s1 α) -> (Array s2 β)))
+                             (Array (S) ((Array s2 β) -> (Array s3 γ)))
+                             -> (Array (S) ((Array s1 α) -> (Array s3 γ)))))]
+                    : (Array (S)
+                             ((Array (S) ((Array s1 α) -> (Array s2 β)))
+                              (Array (S) ((Array s2 β) -> (Array s3 γ)))
+                              -> (Array (S) ((Array s1 α) -> (Array s3 γ))))))
+                 : (∀ [α β γ]
+                      (Array (S)
+                             ((Array (S) ((Array s1 α) -> (Array s2 β)))
+                              (Array (S) ((Array s2 β) -> (Array s3 γ)))
+                              -> (Array (S) ((Array s1 α) -> (Array s3 γ)))))))
+            : (Π [(s1 Shape) (s2 Shape) (s3 Shape)]
+                 (∀ [α β γ]
+                    (Array (S)
+                           ((Array (S) ((Array s1 α) -> (Array s2 β)))
+                            (Array (S) ((Array s2 β) -> (Array s3 γ)))
+                            -> (Array (S) ((Array s1 α) -> (Array s3 γ))))))))))
  
  (check-equal?
   (term (type-erase (A (3) [(A (2) [1 2] : (Array (S 2) Num))
