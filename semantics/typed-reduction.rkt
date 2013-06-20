@@ -7,50 +7,50 @@
 
 (define-extended-language Annotated Dependent
   ; fully-annotated expression forms
-  (expr/t (expr/t expr/t ... : type)
-            var/t
-            arr/t
-            (T-λ [var ...] expr/t : type)
-            (T-APP expr/t type ... : type)
-            (PACK idx ... expr/t : type)
-            (UNPACK ([var ... var] ⇐ expr/t) expr/t : type)
-            (I-λ [(var sort) ...] expr/t : type)
-            (I-APP expr/t idx ... : type))
+  (expr:t (expr:t expr:t ... : type)
+            var:t
+            arr:t
+            (T-λ [var ...] expr:t : type)
+            (T-APP expr:t type ... : type)
+            (PACK idx ... expr:t : type)
+            (UNPACK ([var ... var] ⇐ expr:t) expr:t : type)
+            (I-λ [(var sort) ...] expr:t : type)
+            (I-APP expr:t idx ... : type))
   ; add type annotation to variable/array
-  (var/t (var : type))
+  (var:t (var : type))
   ; 1st type (if present) describes el-exprs
   ; 2nd type describes entire array
-  (arr/t (A type (num ...) (el-expr/t ...) : type)
-         (A (num ...) (el-expr/t ...) : type))
-  (el-expr/t expr/t
+  (arr:t (A type (num ...) (el-expr:t ...) : type)
+         (A (num ...) (el-expr:t ...) : type))
+  (el-expr:t expr:t
              base
-             fun/t)
-  (elt/t base
-         fun/t)
-  (fun/t op
-         (λ [(var type) ...] expr/t : type))
+             fun:t)
+  (elt:t base
+         fun:t)
+  (fun:t op
+         (λ [(var type) ...] expr:t : type))
   
-  (val/t elt/t
-         (A (num ...) (elt/t ...) : type)
-         (PACK idx ... val/t : type))
+  (val:t elt:t
+         (A (num ...) (elt:t ...) : type)
+         (PACK idx ... val:t : type))
   
   (E hole
-     (E expr/t ... : type)
-     (val/t ... E expr/t ... : type)
-     (A (num ...) (val/t ... E el-expr/t ...) : type)
+     (E expr:t ... : type)
+     (val:t ... E expr:t ... : type)
+     (A (num ...) (val:t ... E el-expr:t ...) : type)
      (PACK idx ... E : type)
-     (UNPACK ([var ... var] ⇐ E) expr/t : type)))
+     (UNPACK ([var ... var] ⇐ E) expr:t : type)))
 
 (define ->Typed
   (reduction-relation
    Annotated
-   #:domain expr/t
+   #:domain expr:t
    [--> (in-hole E ((A [] [op] : (Array (S) (type_arg ... -> type_ret)))
-                    val/t ... : type_e))
-        (in-hole E (annotate/cl (apply-op op [(type-erase val/t) ...])))
+                    val:t ... : type_e))
+        (in-hole E (annotate/cl (apply-op op [(type-erase val:t) ...])))
         (where (type_arg/canon ...) ((canonicalize-type type_arg) ...))
         (where (type_val/canon ...)
-               ((canonicalize-type (extract-annotation val/t)) ...))
+               ((canonicalize-type (extract-annotation val:t)) ...))
         op]))
 
 ; use type-of judgment to identify the unique type that matches a given expr
@@ -80,11 +80,11 @@
                            type))]
   [(unique-sort-of sort-env idx) #f])
 
-; add type annotations to convert from expr to expr/t
+; add type annotations to convert from expr to expr:t
 ; assumes the expr is actually well-typed
 ; annotating the body of an abstraction requires looking up the vars it binds
 (define-metafunction Annotated
-  annotate : sort-env kind-env type-env el-expr -> el-expr/t
+  annotate : sort-env kind-env type-env el-expr -> el-expr:t
   [(annotate sort-env kind-env type-env (expr_fun expr_arg ...))
    ((annotate sort-env kind-env type-env expr_fun)
     (annotate sort-env kind-env type-env expr_arg) ... : type)
@@ -138,53 +138,53 @@
   [(annotate sort-env kind-env type-env base) base])
 ; specialized version for closed terms
 (define-metafunction Annotated
-  annotate/cl : el-expr -> el-expr/t
+  annotate/cl : el-expr -> el-expr:t
   [(annotate/cl el-expr) (annotate [] [] [] el-expr)])
 
-; drop type annotations to convert from expr/t to expr
-; assumes the expr/t is actually well-typed
+; drop type annotations to convert from expr:t to expr
+; assumes the expr:t is actually well-typed
 (define-metafunction Annotated
-  type-erase : el-expr/t -> el-expr
-  [(type-erase (expr/t_fun expr/t_arg ... : type))
-   ((type-erase expr/t_fun) (type-erase expr/t_arg) ...)]
+  type-erase : el-expr:t -> el-expr
+  [(type-erase (expr:t_fun expr:t_arg ... : type))
+   ((type-erase expr:t_fun) (type-erase expr:t_arg) ...)]
   [(type-erase (var : type)) var]
   
-  [(type-erase (A type_elt (num ...) (el-expr/t ...) : type_arr))
-   (A type_elt (num ...) ((type-erase el-expr/t) ...))]
-  [(type-erase (A (num ...) (el-expr/t_0 el-expr/t_1 ...) : type_arr))
-   (A (num ...) ((type-erase el-expr/t_0) (type-erase el-expr/t_1) ...))]
+  [(type-erase (A type_elt (num ...) (el-expr:t ...) : type_arr))
+   (A type_elt (num ...) ((type-erase el-expr:t) ...))]
+  [(type-erase (A (num ...) (el-expr:t_0 el-expr:t_1 ...) : type_arr))
+   (A (num ...) ((type-erase el-expr:t_0) (type-erase el-expr:t_1) ...))]
   ; if the array has no elements, we must identify the element type and
   ; put an element annotation for it
-  [(type-erase (A (num ...) (el-expr/t ...) : type))
-   (A type_elt (num ...) ((type-erase el-expr/t) ...))
+  [(type-erase (A (num ...) (el-expr:t ...) : type))
+   (A type_elt (num ...) ((type-erase el-expr:t) ...))
    (where (Array (S num ... num_extras ...) type_atom) (canonicalize-type type))
    (where type_elt (canonicalize-type (Array (S num_extras ...) type_atom)))]
   
-  [(type-erase (T-λ [var ...] expr/t : type))
-   (T-λ [var ...] (type-erase expr/t))]
-  [(type-erase (T-APP expr/t type_arg ... : type))
-   (T-APP (type-erase expr/t) type_arg ...)]
+  [(type-erase (T-λ [var ...] expr:t : type))
+   (T-λ [var ...] (type-erase expr:t))]
+  [(type-erase (T-APP expr:t type_arg ... : type))
+   (T-APP (type-erase expr:t) type_arg ...)]
   
-  [(type-erase (PACK idx ... expr/t : type))
-   (PACK idx ... (type-erase expr/t) type)]
-  [(type-erase (UNPACK ([var_witness ... var_contents] ⇐ expr/t_sum)
-                       expr/t_body : type))
-   (UNPACK ([var_witness ... var_contents] ⇐ (type-erase expr/t_sum))
-           (type-erase expr/t_body))]
+  [(type-erase (PACK idx ... expr:t : type))
+   (PACK idx ... (type-erase expr:t) type)]
+  [(type-erase (UNPACK ([var_witness ... var_contents] ⇐ expr:t_sum)
+                       expr:t_body : type))
+   (UNPACK ([var_witness ... var_contents] ⇐ (type-erase expr:t_sum))
+           (type-erase expr:t_body))]
   
-  [(type-erase (I-λ [(var sort) ...] expr/t : type))
-   (I-λ [(var sort) ...] (type-erase expr/t))]
-  [(type-erase (I-APP expr/t idx ... : type))
-   (I-APP (type-erase expr/t) idx ...)]
+  [(type-erase (I-λ [(var sort) ...] expr:t : type))
+   (I-λ [(var sort) ...] (type-erase expr:t))]
+  [(type-erase (I-APP expr:t idx ... : type))
+   (I-APP (type-erase expr:t) idx ...)]
   
-  [(type-erase (λ [(var type_arg) ...] expr/t : type_fun))
-   (λ [(var type_arg) ...] (type-erase expr/t))]
+  [(type-erase (λ [(var type_arg) ...] expr:t : type_fun))
+   (λ [(var type_arg) ...] (type-erase expr:t))]
   [(type-erase op) op]
   [(type-erase base) base])
 
-; extract an el-expr/t's type
+; extract an el-expr:t's type
 (define-metafunction Annotated
-  extract-annotation : el-expr/t -> type
+  extract-annotation : el-expr:t -> type
   [(extract-annotation (any ... : type)) type])
 
 (module+
