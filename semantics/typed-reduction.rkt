@@ -30,6 +30,8 @@
   (fun:t op
          (λ [(var type) ...] expr:t : type))
   
+  (expr:t-env (e:t-bind ...)) (e:t-bind [var expr:t])
+  
   (val:t elt:t
          (A (num ...) (elt:t ...) : type)
          (PACK idx ... val:t : type))
@@ -186,6 +188,148 @@
 (define-metafunction Annotated
   extract-annotation : el-expr:t -> type
   [(extract-annotation (any ... : type)) type])
+
+; substitute an expr:t into an expr:t
+(define-metafunction Annotated
+  expr:t/expr:t-sub : expr:t-env el-expr:t -> el-expr:t
+  [(expr:t/expr:t-sub ([var_0 expr:t_0] ... [var expr:t] [var_1 expr:t_1] ...)
+                      (var : type))
+   expr:t]
+  [(expr:t/expr:t-sub expr:t-env var) (var : type)]
+  
+  [(expr:t/expr:t-sub expr:t-env (expr:t_fun expr:t_arg ... : type))
+   ((expr:t/expr:t-sub expr:t-env expr:t_fun)
+    (expr:t/expr:t-sub expr:t-env expr:t_arg) ... : type)]
+  
+  [(expr:t/expr:t-sub expr:t-env (A type_elt (num ...) (el-expr:t ...) : type))
+   (A type_elt (num ...) [(expr:t/expr:t-sub expr:t-env el-expr:t) ...] : type)]
+  [(expr:t/expr:t-sub expr:t-env (A (num ...) (el-expr:t ...) : type))
+   (A (num ...) [(expr:t/expr:t-sub expr:t-env el-expr:t) ...] : type)]
+  
+  [(expr:t/expr:t-sub expr:t-env (T-λ [var ...] expr:t : type))
+   (T-λ [var ...] (expr:t/expr:t-sub expr:t-env expr:t) : type)]
+  [(expr:t/expr:t-sub expr:t-env (T-APP expr:t type_arg ... : type))
+   (T-APP (expr:t/expr:t-sub expr:t-env expr:t) type_arg ... : type)]
+  
+  [(expr:t/expr:t-sub expr:t-env (PACK idx ... expr:t : type))
+   (PACK idx ... (expr:t/expr:t-sub expr:t-env expr:t) : type)]
+  [(expr:t/expr:t-sub
+    expr:t-env (UNPACK ([var_witness ... var_contents] ⇐ expr:t_sum)
+                       expr:t_body : type))
+   (UNPACK ([var_witness ... var_contents]
+            ⇐ (expr:t/expr:t-sub expr:t-env expr:t_sum))
+           (expr:t/expr:t-sub (shadow [var_contents] expr:t-env)
+                              expr:t_body) : type)]
+  [(expr:t/expr:t-sub expr:t-env (I-λ [(var sort) ...] expr:t : type))
+   (I-λ [(var sort) ...] (expr:t/expr:t-sub expr:t-env expr:t) : type)]
+  [(expr:t/expr:t-sub expr:t-env (T-APP expr:t type_arg ... : type))
+   (T-APP (expr:t/expr:t-sub expr:t-env expr:t) type_arg ... : type)]
+  
+  [(expr:t/expr:t-sub expr:t-env op) op]
+  [(expr:t/expr:t-sub expr:t-env base) base]
+  [(expr:t/expr:t-sub expr:t-env (λ [(var type_arg) ...] expr:t : type_fun))
+   (λ [(var type_arg) ...]
+     (expr:t/expr:t-sub (shadow (var ...) expr:t-env) expr:t) : type_fun)])
+
+; substitute a type into an expr:t
+(define-metafunction Annotated
+  type/expr:t-sub : type-env el-expr:t -> el-expr:t
+  [(type/expr:t-sub type-env (var : type))
+   (var : (type/type-sub type-env type))]
+  
+  [(type/expr:t-sub type-env (expr:t_fun expr:t_arg ... : type))
+   ((type/expr:t-sub type-env expr:t_fun)
+    (type/expr:t-sub type-env expr:t_arg) ...
+    : (type/type-sub type-env type))]
+  
+  [(type/expr:t-sub type-env (A type_elt (num ...) (el-expr:t ...) : type))
+   (A (type/expr:t-sub type-env type_elt)
+      (num ...) ((type/expr:t-sub type-env el-expr:t) ...)
+      : (type/type-sub type-env type))]
+  [(type/expr:t-sub type-env (A (num ...) (el-expr:t ...) : type))
+   (A (num ...) ((type/expr:t-sub type-env el-expr:t) ...)
+      : (type/type-sub type-env type))]
+  
+  [(type/expr:t-sub type-env (T-λ [var ...] expr:t : type))
+   (T-λ [var ...]
+        (type/expr:t-sub (shadow (var ...) type-env) expr:t)
+        : (type/type-sub type-env type))]
+  [(type/expr:t-sub type-env (T-APP expr:t type_arg ... : type))
+   (T-APP (type/expr:t-sub type-env expr:t)
+          (type/type-sub type-env type_arg) ...
+          : (type/type-sub type-env type))]
+  
+  [(type/expr:t-sub type-env (PACK idx ... expr:t : type))
+   (PACK idx ... (type/expr:t-sub type-env expr:t)
+         : (type/type-sub type-env type))]
+  [(type/expr:t-sub type-env
+                    (UNPACK ([var_witness ... var_contents] ⇐ expr:t_sum)
+                       expr:t_body : type))
+   (UNPACK ([var_witness ... var_contents]
+            ⇐ (type/expr:t-sub type-env expr:t_sum))
+           (type/expr:t-sub type-env expr:t_body)
+           : (type/type-sub type-env type))]
+  
+  [(type/expr:t-sub type-env (I-λ [(var sort) ...] expr:t : type))
+   (I-λ [var ...] (type/expr:t-sub type-env expr:t)
+        : (type/type-sub type-env type))]
+  [(type/expr:t-sub type-env (I-APP expr:t idx_arg ... : type))
+   (I-APP (type/expr:t-sub type-env expr:t) idx_arg ...
+          : (type/type-sub type-env type))]
+  
+  [(type/expr:t-sub type-env op) op]
+  [(type/expr:t-sub type-env base) base]
+  [(type/expr:t-sub type-env (λ [(var type_arg) ...] expr:t : type_fun))
+   (λ [(var (type/type-sub type-env type_arg)) ...]
+     (type/expr:t-sub type-env expr:t)
+     : (type/type-sub type-env type_fun))])
+
+; substitute an index into an expr:t
+(define-metafunction Annotated
+  idx/expr:t-sub : idx-env el-expr:t -> el-expr:t
+  [(idx/expr:t-sub idx-env (var : type)) (var : (idx/type-sub type))]
+  
+  [(idx/expr:t-sub idx-env (expr:t_fun expr:t_arg ... : type))
+   ((idx/expr:t-sub idx-env expr:t_fun)
+    (idx/expr:t-sub idx-env expr:t_arg) ...
+    : (idx/type-sub idx-env type))]
+  
+  [(idx/expr:t-sub idx-env (A type_elt (num ...) (el-expr:t ...) : type))
+   (A (idx/type-sub type_elt)
+      (num ...) ((idx/expr:t-sub el-expr:t) ...) : (idx/type-sub type))]
+  [(idx/expr:t-sub idx-env (A (num ...) (el-expr:t ...) : type))
+   (A (num ...) ((idx/expr:t-sub el-expr:t) ...) : (idx/type-sub type))]
+  
+  [(idx/expr:t-sub idx-env (T-λ [var ...] expr:t : type))
+   (T-λ [var ...] (idx/expr:t-sub idx-env expr:t) : (idx/type-sub type))]
+  [(idx/expr:t-sub idx-env (T-APP expr:t type_arg ... : type))
+   (T-APP (idx/expr:t-sub idx-env expr:t) (idx/type-sub type_arg) ...
+          : (idx/type-sub type))]
+  
+  [(idx/expr:t-sub idx-env (PACK idx ... expr:t : type))
+   (PACK (idx/idx-sub idx) ... (idx/expr:t-sub idx-env expr:t)
+         : (idx/type-sub type))]
+  [(idx/expr:t-sub idx-env (UNPACK ([var_witness ... var_contents] ⇐ expr:t_sum)
+                                   expr:t_body : type))
+   (UNPACK ([var_witness ... var_contents]
+            ⇐ (idx/expr:t-sub idx-env expr:t_sum))
+           (idx/expr:t-sub idx-env expr:t_body)
+           : (idx/type-sub type))]
+  
+  [(idx/expr:t-sub idx-env (I-λ [(var sort) ...] expr:t : type))
+   (I-λ [(var sort) ...] (idx/expr:t-sub (shadow (var ...) idx-env) expr:t)
+        : (idx/type-sub type))]
+  [(idx/expr:t-sub idx-env (I-APP expr:t idx ... : type))
+   (I-APP (idx/expr:t-sub idx-env expr:t) (idx/idx-sub idx) ...
+          : (idx/type-sub type))]
+  
+  [(idx/expr:t-sub idx-env op) op]
+  [(idx/expr:t-sub idx-env base) base]
+  [(idx/expr:t-sub idx-env (λ [(var type_arg) ...] expr:t : type_fun))
+   (λ [(var (idx/type-sub idx-env type_arg)) ...]
+     (idx/expr:t-sub idx-env expr:t)
+     : (idx/type-sub type-env type_fun))])
+
 
 (module+
  test
