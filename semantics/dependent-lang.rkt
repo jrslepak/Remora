@@ -6,6 +6,8 @@
 (provide Dependent
          type-of kind-of sort-of
          type-env-update kind-env-update sort-env-update
+         type/type-sub idx/type-sub idx/idx-sub
+         shadow
          canonicalize-type)
 
 (define-extended-language Dependent Arrays
@@ -179,7 +181,7 @@
    (sort-of sort-env idx_arg sort) ...
    --- idx-app
    (type-of sort-env kind-env type-env (I-APP expr idx_arg ...)
-            (Array idx_prod (index/type-sub ([var idx_arg] ...) type)))]
+            (Array idx_prod (idx/type-sub ([var idx_arg] ...) type)))]
   
   ; projection from dependent sum
   [(type-of sort-env kind-env type-env
@@ -198,7 +200,7 @@
   [(sort-of sort-env idx sort) ...
    ; type_subbed in the type-of premise is in a position where metafunctions
    ; don't get evaluated, so we have to evaluate it in a `where' clause
-   (where type_subbed (index/type-sub [(var idx) ...] type))
+   (where type_subbed (idx/type-sub [(var idx) ...] type))
    (type-of sort-env kind-env type-env expr type_subbed)
    ;(where type_0 (canonicalize-type type))
    ---
@@ -441,74 +443,74 @@
 ;--------------------------------
 ; substitute indices into an (element) expression
 (define-metafunction Dependent
-  index/expr-sub : idx-env el-expr -> el-expr
-  [(index/expr-sub idx-env var) var]
-  [(index/expr-sub idx-env base) base]
-  [(index/expr-sub idx-env (A (idx ...) (el-expr ...)))
-   (A ((index/index-sub idx-env idx) ...)
-      ((index/expr-sub idx-env el-expr) ...))]
+  idx/expr-sub : idx-env el-expr -> el-expr
+  [(idx/expr-sub idx-env var) var]
+  [(idx/expr-sub idx-env base) base]
+  [(idx/expr-sub idx-env (A (idx ...) (el-expr ...)))
+   (A ((idx/idx-sub idx-env idx) ...)
+      ((idx/expr-sub idx-env el-expr) ...))]
   ; function-like forms
-  [(index/expr-sub idx-env (λ [(var num type) ...] expr))
-   (λ [(var (index/type-sub idx-env type)) ...]
-     (index/expr-sub idx-env expr))]
-  [(index/expr-sub idx-env fun) fun]
-  [(index/expr-sub idx-env (T-λ [var ...] expr))
-   (T-λ [var ...] (index/expr-sub idx-env expr))]
-  [(index/expr-sub idx-env (I-λ [(var sort) ...] expr))
+  [(idx/expr-sub idx-env (λ [(var num type) ...] expr))
+   (λ [(var (idx/type-sub idx-env type)) ...]
+     (idx/expr-sub idx-env expr))]
+  [(idx/expr-sub idx-env fun) fun]
+  [(idx/expr-sub idx-env (T-λ [var ...] expr))
+   (T-λ [var ...] (idx/expr-sub idx-env expr))]
+  [(idx/expr-sub idx-env (I-λ [(var sort) ...] expr))
    ; index vars are shadowed by the I-λ-binder
-   (I-λ [(var sort) ...] (index/expr-sub (shadow (var ...) idx-env) expr))]
+   (I-λ [(var sort) ...] (idx/expr-sub (shadow (var ...) idx-env) expr))]
   ; application forms
-  [(index/expr-sub idx-env (expr_fun expr_arg ...))
-   ((index/expr-sub idx-env expr_fun)
-    (index/expr-sub idx-env expr_arg) ...)]
-  [(index/expr-sub idx-env (T-APP expr_fun type_arg ...))
-   ((index/expr-sub idx-env expr_fun)
-    (index/type-sub idx-env type_arg) ...)]
-  [(index/expr-sub idx-env (I-APP expr_fun idx_arg ...))
-   ((index/expr-sub idx-env expr_fun)
-    (index/expr-sub idx-env idx_arg) ...)]
+  [(idx/expr-sub idx-env (expr_fun expr_arg ...))
+   ((idx/expr-sub idx-env expr_fun)
+    (idx/expr-sub idx-env expr_arg) ...)]
+  [(idx/expr-sub idx-env (T-APP expr_fun type_arg ...))
+   ((idx/expr-sub idx-env expr_fun)
+    (idx/type-sub idx-env type_arg) ...)]
+  [(idx/expr-sub idx-env (I-APP expr_fun idx_arg ...))
+   ((idx/expr-sub idx-env expr_fun)
+    (idx/expr-sub idx-env idx_arg) ...)]
   ; dependent sums
-  [(index/expr-sub idx-env (PACK idx ... expr type))
-   (PACK (index/index-sub idx-env idx) ...
-         (index/expr-sub idx-env expr)
-         (index/type-sub idx-env type))]
-  [(index/expr-sub idx-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum)
+  [(idx/expr-sub idx-env (PACK idx ... expr type))
+   (PACK (idx/idx-sub idx-env idx) ...
+         (idx/expr-sub idx-env expr)
+         (idx/type-sub idx-env type))]
+  [(idx/expr-sub idx-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum)
                                    expr_body))
-   (UNPACK ([var_wit ... var_cont] ⇐ (index/expr-sub idx-env expr_sum))
-           (index/expr-sub idx-env_shadowed expr_body))
+   (UNPACK ([var_wit ... var_cont] ⇐ (idx/expr-sub idx-env expr_sum))
+           (idx/expr-sub idx-env_shadowed expr_body))
    (where idx-env_shadowed (shadow (var_wit ...) idx-env))])
 
 ; substitute indices into a type
 (define-metafunction Dependent
-  index/type-sub : idx-env type -> type
-  [(index/type-sub idx-env var) var]
-  [(index/type-sub idx-env base-type) base-type]
-  [(index/type-sub idx-env (Array idx type))
-   (Array (index/index-sub idx-env idx) (index/type-sub idx-env type))]
-  [(index/type-sub idx-env (type_arg ... -> type_result))
-   ((index/type-sub idx-env type_arg) ...
-    -> (index/type-sub idx-env type_result))]
-  [(index/type-sub idx-env (× type ...))
-   (× (index/type-sub idx-env type) ...)]
-  [(index/type-sub idx-env (Π [(var sort) ...] type))
-   (Π [(var sort) ...] (index/type-sub idx-env_shadowed type))
+  idx/type-sub : idx-env type -> type
+  [(idx/type-sub idx-env var) var]
+  [(idx/type-sub idx-env base-type) base-type]
+  [(idx/type-sub idx-env (Array idx type))
+   (Array (idx/idx-sub idx-env idx) (idx/type-sub idx-env type))]
+  [(idx/type-sub idx-env (type_arg ... -> type_result))
+   ((idx/type-sub idx-env type_arg) ...
+    -> (idx/type-sub idx-env type_result))]
+  [(idx/type-sub idx-env (× type ...))
+   (× (idx/type-sub idx-env type) ...)]
+  [(idx/type-sub idx-env (Π [(var sort) ...] type))
+   (Π [(var sort) ...] (idx/type-sub idx-env_shadowed type))
    (where idx-env_shadowed (shadow (var ...) idx-env))]
-  [(index/type-sub idx-env (Σ [(var sort) ...] type))
-   (Σ [(var sort) ...] (index/type-sub idx-env_shadowed type))
+  [(idx/type-sub idx-env (Σ [(var sort) ...] type))
+   (Σ [(var sort) ...] (idx/type-sub idx-env_shadowed type))
    (where idx-env_shadowed (shadow (var ...) idx-env))]
-  [(index/type-sub idx-env (∀ [var ...] type))
-   (∀ [var ...] (index/type-sub idx-env type))])
+  [(idx/type-sub idx-env (∀ [var ...] type))
+   (∀ [var ...] (idx/type-sub idx-env type))])
 
 ; substitute indices into an index
 (define-metafunction Dependent
-  index/index-sub : idx-env idx -> idx
-  [(index/index-sub ([var_0 idx_0] ... [var_1 idx_1] [var_2 idx_2] ...) var_1)
+  idx/idx-sub : idx-env idx -> idx
+  [(idx/idx-sub ([var_0 idx_0] ... [var_1 idx_1] [var_2 idx_2] ...) var_1)
    idx_1
    (side-condition (not (member (term var_1) (term (var_0 ...)))))]
-  [(index/index-sub idx-env var) var]
-  [(index/index-sub idx-env natural) natural]
-  [(index/index-sub idx-env (S idx ...)) (S (index/index-sub idx-env idx) ...)]
-  [(index/index-sub idx-env (PLUS idx_0 idx_1))
+  [(idx/idx-sub idx-env var) var]
+  [(idx/idx-sub idx-env natural) natural]
+  [(idx/idx-sub idx-env (S idx ...)) (S (idx/idx-sub idx-env idx) ...)]
+  [(idx/idx-sub idx-env (PLUS idx_0 idx_1))
    (PLUS (index-sub idx-env idx_0) (index-sub idx-env idx_1))])
 
 ; substitute types into an (element) expression
@@ -538,10 +540,10 @@
           (type/type-sub type-env type) ...)]
   [(type/expr-sub type-env (I-APP expr idx ...))
    (I-APP (type/expr-sub type-env expr)
-          (type/index-sub type-env idx) ...)]
+          (type/idx-sub type-env idx) ...)]
   ; dependent sums
   [(type/expr-sub type-env (PACK idx ... expr type))
-   (PACK (type/index-sub type-env idx) ...
+   (PACK (type/idx-sub type-env idx) ...
          (type/expr-sub type-env expr)
          (type/type-sub type-env type))]
   [(type/expr-sub type-env (UNPACK ([var_wit ... var_cont] ⇐ expr_sum)
@@ -574,13 +576,13 @@
 
 ; substitute types into an index
 (define-metafunction Dependent
-  type/index-sub : type-env idx -> idx
-  [(type/index-sub type-env var) var]
-  [(type/index-sub type-env natural) natural]
-  [(type/index-sub type-env (S idx ...))
-   (S (type/index-sub type-env idx) ...)]
-  [(type/index-sub type-env (PLUS idx_0 idx_1))
-   (PLUS (type/index-sub type-env idx_0) (type/index-sub type-env idx_1))])
+  type/idx-sub : type-env idx -> idx
+  [(type/idx-sub type-env var) var]
+  [(type/idx-sub type-env natural) natural]
+  [(type/idx-sub type-env (S idx ...))
+   (S (type/idx-sub type-env idx) ...)]
+  [(type/idx-sub type-env (PLUS idx_0 idx_1))
+   (PLUS (type/idx-sub type-env idx_0) (type/idx-sub type-env idx_1))])
 
 ; substitute (element) expressions into an (element) expression
 (define-metafunction Dependent
@@ -645,13 +647,13 @@
 
 ; substitute expressions into an index
 (define-metafunction Dependent
-  expr/index-sub : expr-env type -> type
-  [(expr/index-sub expr-env var) var]
-  [(expr/index-sub expr-env natural) natural]
-  [(expr/index-sub expr-env (S idx ...))
-   (S (expr/index-sub expr-env idx) ...)]
-  [(expr/index-sub expr-env (PLUS idx_0 idx_1))
-   (PLUS (expr/index-sub expr-env idx_0) (expr/index-sub expr-env idx_1))])
+  expr/idx-sub : expr-env type -> type
+  [(expr/idx-sub expr-env var) var]
+  [(expr/idx-sub expr-env natural) natural]
+  [(expr/idx-sub expr-env (S idx ...))
+   (S (expr/idx-sub expr-env idx) ...)]
+  [(expr/idx-sub expr-env (PLUS idx_0 idx_1))
+   (PLUS (expr/idx-sub expr-env idx_0) (expr/idx-sub expr-env idx_1))])
 
 
 ; reduce a type to canonical form:
