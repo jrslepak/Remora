@@ -53,7 +53,19 @@
         (where (type_arg/canon ...) ((canonicalize-type type_arg) ...))
         (where (type_val/canon ...)
                ((canonicalize-type (extract-annotation val:t)) ...))
-        op]))
+        (side-condition (equal? (term (type_arg/canon ...))
+                                (term (type_val/canon ...))))
+        op]
+   [--> (in-hole E ((A [] [(λ [(var type_arg) ...] expr:t : type_fun)]
+                       : type_arr)
+                    val:t ... : type_app))
+        (in-hole E (expr:t/expr:t-sub [(var val:t) ...] expr:t))
+        (where (type_arg/canon ...) ((canonicalize-type type_arg) ...))
+        (where (type_val/canon ...)
+               ((canonicalize-type (extract-annotation val:t)) ...))
+        (side-condition (equal? (term (type_arg/canon ...))
+                                (term (type_val/canon ...))))
+        apply]))
 
 ; use type-of judgment to identify the unique type that matches a given expr
 (define-metafunction Dependent
