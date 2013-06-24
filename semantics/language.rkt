@@ -3,6 +3,7 @@
 (require redex)
 (provide Arrays ->Array
          take/m drop/m take-right/m drop-right/m prefix? all
+         transpose/m cells/shape
          apply-op
          shape)
 

@@ -65,7 +65,43 @@
                ((canonicalize-type (extract-annotation val:t)) ...))
         (side-condition (equal? (term (type_arg/canon ...))
                                 (term (type_val/canon ...))))
-        apply]))
+        apply]
+   [--> (in-hole E ((A [num_f ...] [fun:t ...]
+                       : (Array (S num_f ...) (type_arg ... -> type_ret)))
+                    val:t ...
+                    : (Array (S num_f ...) type_app)))
+        (in-hole E (A [num_f ...]
+                      [((A [] [fun:t] : (Array (S) (type_arg ... -> type_ret)))
+                        arr:t_cell ... : type_app/c) ...]
+                      : (Array (S num_f ...) type_app/c)))
+        (side-condition (< 0 (length (term (num_f ...)))))
+        (where type_app/c (canonicalize-type (Array (S) type_app)))
+        (side-condition (term (equiv-type? (Array (S) type_ret) type_app/c)))
+        (side-condition
+         (term (all ((equiv-type? (extract-annotation val:t)
+                                  (Array (S num_f ...) type_arg)) ...))))
+        (where ((Array idx_c type_argelt) ...) (type_arg ...))
+        (where (S num_c ...) (unique-elt (idx_c ...)))
+        (where ((arr_cell ...) ...)
+               (transpose/m ((cells/shape (num_c ...) (type-erase val:t)) ...)))
+        (where ((arr:t_cell ...) ...)
+               (((annotate/cl arr_cell) ...) ...))
+        map]))
+
+; select the unique element from a list that repeats only that element
+(define-metafunction Annotated
+  unique-elt : (any any ...) -> any
+  [(unique-elt (any)) any]
+  [(unique-elt (any_0 any_0 any_1 ...)) (unique-elt (any_0 any_1 ...))])
+
+; check whether two types are equivalent
+(define-metafunction Dependent
+  equiv-type? : type type -> bool
+  [(equiv-type? type_0 type_1)
+   #t
+   (side-condition (equal? (term (canonicalize-type type_0))
+                           (term (canonicalize-type type_1))))]
+  [(equiv-type? type_0 type_1) #f])
 
 ; use type-of judgment to identify the unique type that matches a given expr
 (define-metafunction Dependent
@@ -359,12 +395,19 @@
    (term (annotate/cl ((A [] [+]) (A [] [1])
                                   ((A [] [+]) (A [] [1]) (A [] [1]))))))
   (term (A [] [3] : (Array (S) Num))))
+ 
  (check-equal?
   (deterministic-reduce
    ->Typed
    (term (annotate/cl ((A [] [+]) ((A [] [+]) (A [] [1]) (A [] [1]))
                                   (A [] [1])))))
   (term (A [] [3] : (Array (S) Num))))
+ 
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl ((A [2] [+ -]) (A [2] [10 20]) (A [2] [3 4])))))
+  (term (annotate/cl (A [2] [(A [] [13]) (A [] [16])]))))
  
  (check-equal?
   (term (annotate [][][] ((A [] [+]) (A Num [2] [1 3]) (A [] [4]))))

@@ -401,6 +401,9 @@
   primop-type : fun -> type
   [(primop-type +) ((Array (S) Num)
                     (Array (S) Num)
+                    -> (Array (S) Num))]
+  [(primop-type -) ((Array (S) Num)
+                    (Array (S) Num)
                     -> (Array (S) Num))])
 
 ; determine the argument ranks a function expects
