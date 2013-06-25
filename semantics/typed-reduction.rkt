@@ -86,7 +86,14 @@
                (transpose/m ((cells/shape (num_c ...) (type-erase val:t)) ...)))
         (where ((arr:t_cell ...) ...)
                (((annotate/cl arr_cell) ...) ...))
-        map]))
+        map]
+   [--> (in-hole E (A [num_f ...] [(A [num_c ...] [elt:t ...] : type_c) ...]
+                      : type_f))
+        (in-hole E (A [num_f ... num_c0 ...] [any_v ...]
+                      : (canonicalize-type type_f)))
+        (where (num_c0 ...) (unique-elt ((num_c ...) ...)))
+        (where (any_v ...) ,(foldr append '() (term ((elt:t ...) ...))))
+        collapse]))
 
 ; select the unique element from a list that repeats only that element
 (define-metafunction Annotated
@@ -407,7 +414,7 @@
   (deterministic-reduce
    ->Typed
    (term (annotate/cl ((A [2] [+ -]) (A [2] [10 20]) (A [2] [3 4])))))
-  (term (annotate/cl (A [2] [(A [] [13]) (A [] [16])]))))
+  (term (annotate/cl (A [2] [13 16]))))
  
  (check-equal?
   (term (annotate [][][] ((A [] [+]) (A Num [2] [1 3]) (A [] [4]))))
