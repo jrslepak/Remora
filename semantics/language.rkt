@@ -2,9 +2,9 @@
 
 (require redex)
 (provide Arrays ->Array
-         take/m drop/m take-right/m drop-right/m prefix? all
-         transpose/m cells/shape
-         apply-op
+         take/m drop/m take-right/m drop-right/m prefix? all all-equal?
+         length/m transpose/m cells/shape
+         apply-op frame-lift
          shape)
 
 (define-language Arrays

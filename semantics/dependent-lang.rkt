@@ -830,14 +830,6 @@
   [(argmax/m (number ...)) ,(argmax (λ (x) x) (term (number ...)))])
 
 
-(define-metafunction Dependent
-  all-equal? : (any ...) -> bool
-  [(all-equal? ()) #t]
-  [(all-equal? (any)) #t]
-  [(all-equal? (any_1 any_1 any_2 ...))
-   ,(and (term (all-equal? (any_1 any_2 ...))))]
-  [(all-equal? any) #f])
-
 (module+
  test
  
