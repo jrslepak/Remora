@@ -87,6 +87,31 @@
         (where ((arr:t_cell ...) ...)
                (((annotate/cl arr_cell) ...) ...))
         map]
+   [--> (in-hole E ((A [num_f ...] [fun:t ...]
+                      : (Array (S num_f ...) (type_arg ... -> type_ret)))
+                    val:t ...
+                    : (Array (S num_app ...) type_app)))
+        (in-hole E (arr:t_lifted val:t_lifted ...
+                                 : (Array (S num_app ...) type_app)))
+        ; identify cell shape for fun/args
+        (where ((Array (S num_argcell ...) type_argelt) ...)
+               ((canonicalize-type (Array (S) type_arg)) ...))
+        (where ((num_cell ...) ...) (() (num_argcell ...) ...))
+        ; make sure frame ranks aren't all the same
+        ; (for well-typed code, equivalent to "shapes aren't all the same")
+        (where ((Array (S num_argframe ... num_argcell ...) type_elt) ...)
+               ((canonicalize-type (extract-annotation val:t)) ...))
+        (side-condition (not (term (all-equal? ((num_argframe ...) ...)))))
+        ; duplicate the cells
+        (where (arr_lfun arr_larg ...)
+               (frame-lift
+                [(0 (type-erase (A [num_f ...] [fun:t ...]
+                                   : (Array (S num_f ...)
+                                            (type_arg ... -> type_ret)))))
+                 ((length/m (num_argcell ...)) (type-erase val:t)) ...]))
+        (where (arr:t_lifted val:t_lifted ...)
+               ((annotate/cl arr_lfun) (annotate/cl arr_larg) ...))
+        lift]
    [--> (in-hole E (A [num_f ...] [(A [num_c ...] [elt:t ...] : type_c) ...]
                       : type_f))
         (in-hole E (A [num_f ... num_c0 ...] [any_v ...]
@@ -415,6 +440,24 @@
    ->Typed
    (term (annotate/cl ((A [2] [+ -]) (A [2] [10 20]) (A [2] [3 4])))))
   (term (annotate/cl (A [2] [13 16]))))
+ 
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl ((A [] [+]) (A [2 3] [1 2 3 4 5 6]) (A [2] [10 20])))))
+  (term (annotate/cl (A [2 3] [11 12 13 24 25 26]))))
+ 
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl ((A [] [+]) (A [3 2] [1 2 3 4 5 6]) (A [3] [10 20 30])))))
+  (term (annotate/cl (A [3 2] [11 12 23 24 35 36]))))
+ 
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl ((A [2] [+ -]) (A [2 3] [1 2 3 4 5 6]) (A [2] [10 20])))))
+  (term (annotate/cl (A [2 3] [11 12 13 -16 -15 -14]))))
  
  (check-equal?
   (term (annotate [][][] ((A [] [+]) (A Num [2] [1 3]) (A [] [4]))))
