@@ -410,6 +410,17 @@
      (idx/expr:t-sub idx-env expr:t)
      : (idx/type-sub type-env type_fun))])
 
+; like using traces with ->Typed, but hide the type annotations
+(define (simple-trace t)
+  (define t/ann
+    (cond [(redex-match Annotated expr:t t) t]
+          [(redex-match Annotated expr t) (term (annotate/cl ,t))]))
+  (traces #:pp (λ (v port width text)
+                 (default-pretty-printer
+                   (term (type-erase ,v))
+                   port width text))
+          ->Typed t/ann))
+
 
 (module+
  test
