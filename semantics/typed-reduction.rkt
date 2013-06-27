@@ -82,10 +82,9 @@
                                   (Array (S num_f ...) type_arg)) ...))))
         (where ((Array idx_c type_argelt) ...) (type_arg ...))
         (where (S num_c ...) (unique-elt (idx_c ...)))
-        (where ((arr_cell ...) ...)
-               (transpose/m ((cells/shape (num_c ...) (type-erase val:t)) ...)))
         (where ((arr:t_cell ...) ...)
-               (((annotate/cl arr_cell) ...) ...))
+               (transpose/m
+                ((cells/shape:t (num_c ...) val:t) ...)))
         map]
    [--> (in-hole E ((A [num_f ...] [fun:t ...]
                       : (Array (S num_f ...) (type_arg ... -> type_ret)))
@@ -96,21 +95,19 @@
         ; identify cell shape for fun/args
         (where ((Array (S num_argcell ...) type_argelt) ...)
                ((canonicalize-type (Array (S) type_arg)) ...))
-        (where ((num_cell ...) ...) (() (num_argcell ...) ...))
         ; make sure frame ranks aren't all the same
         ; (for well-typed code, equivalent to "shapes aren't all the same")
         (where ((Array (S num_argframe ... num_argcell ...) type_elt) ...)
                ((canonicalize-type (extract-annotation val:t)) ...))
-        (side-condition (not (term (all-equal? ((num_argframe ...) ...)))))
+        (side-condition
+         (not (term (all-equal? ((num_f ...) (num_argframe ...) ...)))))
         ; duplicate the cells
-        (where (arr_lfun arr_larg ...)
-               (frame-lift
-                [(0 (type-erase (A [num_f ...] [fun:t ...]
-                                   : (Array (S num_f ...)
-                                            (type_arg ... -> type_ret)))))
-                 ((length/m (num_argcell ...)) (type-erase val:t)) ...]))
         (where (arr:t_lifted val:t_lifted ...)
-               ((annotate/cl arr_lfun) (annotate/cl arr_larg) ...))
+               (frame-lift:t
+                [(0 (A [num_f ...] [fun:t ...]
+                                   : (Array (S num_f ...)
+                                            (type_arg ... -> type_ret))))
+                 ((length/m (num_argcell ...)) val:t) ...]))
         lift]
    [--> (in-hole E (A [num_f ...] [(A [num_c ...] [elt:t ...] : type_c) ...]
                       : type_f))
@@ -119,6 +116,101 @@
         (where (num_c0 ...) (unique-elt ((num_c ...) ...)))
         (where (any_v ...) ,(foldr append '() (term ((elt:t ...) ...))))
         collapse]))
+
+;; grow argument arrays by duplication so they all have their desired ranks
+;; cell ranks must be naturalized
+(define-metafunction Annotated
+  ; [(cell-rank array) ...]
+  frame-lift:t : [(num arr:t) ...] -> (arr:t ...) or #f
+  [(frame-lift:t []) ()]
+  ; make sure arrays can be lifted into same frame
+  ; (need prefix relation for frame shapes)
+  ; "principal frame" comes from least-overranked array
+  [(frame-lift:t [(num_cr arr:t) ...])
+   ((cell-dup:t num_cr (num_pr-frame-dim ...) arr:t) ...)
+   ; extract frame shapes
+   (where ((num_fr ...) ...)
+          ((drop-right/m (shape:t arr:t) num_cr) ...))
+   ; find the longest one -- that is the principal frame
+   (where (num_pr-frame-dim ...) (longest ((num_fr ...) ...)))
+   ; all other frames must be prefixes of it
+   (side-condition
+    (term (all ((prefix? (num_fr ...) (num_pr-frame-dim ...)) ...))))]
+  ; not a frame-liftable input (e.g. due to frame mismatch)
+  [(frame-lift:t any) #f])
+
+;; extract shape of array
+(define-metafunction Annotated
+  shape:t : arr:t -> (num ...)
+  [(shape:t (A (num ...) (el-expr:t ...) : type)) (num ...)])
+
+;; extract rank of array
+(define-metafunction Annotated
+  rank:t : arr:t -> num
+  [(rank:t (A (num ...) (el-expr:t ...) : type))
+   ,(length (term (num ...)))])
+
+;; duplicate cells of given array to lift it into desired frame
+(define-metafunction Annotated
+  ; cell rank, frame shape, initial array
+  cell-dup:t : num (num ...) arr:t -> arr:t
+  ; All elements of a single cell should appear consecutively in value segment
+  ; Just split value into chunks, repeat chunks right number of times, and
+  ; update the shape.
+  [(cell-dup:t num_cell-rank (num_frame-dim ...) arr:t)
+   ; new array's shape is frame-portion ++ growth-portion ++ cell-shape
+   ; new array's value comes from repeating the cells (number of copies is
+   ; product of the "growth" portion of the shape)
+   (A ,(append (term (drop-right/m (shape:t arr:t) num_cell-rank))
+               (term (num_growth ...))
+               (term (take-right/m (shape:t arr:t) num_cell-rank)))
+      ,(foldr append '()
+              (term ((repeat ,(foldr * 1 (term (num_growth ...)))
+                             (el-expr:t_cell ...)) ...)))
+      : (Array (S num_frame-dim ... num_cell-dim ...) type_atom))
+   ; constructing the result annotation based on the original annotation
+   (where (Array (S num_orig ...) type_atom)
+          (extract-annotation arr:t))
+   (where (num_cell-dim ...)
+          (take-right/m (num_orig ...) num_cell-rank))
+   ; break the array's value segment into its cells
+   (where ((el-expr:t_cell ...) ...)
+          (cell-values:t (take-right/m (shape:t arr:t) num_cell-rank) arr:t))
+   ; identify the part of the result shape that comes from lifting
+   ; drop frame portion of array from left side of frame
+   (where (num_growth ...)
+          (drop/m (num_frame-dim ...)
+                  ,(- (term (rank:t arr:t)) (term num_cell-rank))))
+   ; require that the array actually be liftable into the frame
+   ; i.e. frame portion of array must be prefix of given frame
+   (side-condition (term (prefix? (drop-right/m (shape:t arr:t) num_cell-rank)
+                                  (num_frame-dim ...))))])
+
+;; extract the value segments of an array's cells
+(define-metafunction Annotated
+  ; cell shape, array
+  cell-values:t : (num ...) arr:t -> ((el-expr:t ...) ...)
+  [(cell-values:t (num_cellshape ...) arr:t)
+   ((el-expr:t ...) ...)
+   (where ((A (num ...) (el-expr:t ...) : type) ...)
+          (cells/shape:t (num_cellshape ...) arr:t))])
+
+;; split an array into cells
+(define-metafunction Annotated
+  ; cell shape, array
+  cells/shape:t : (num ...) arr:t -> (arr:t ...)
+  [(cells/shape:t (num_cell-dim ...) (A (num_arr-dim ...) () : type)) ()]
+  [(cells/shape:t (num_cell-dim ...)
+                  (A (num_arr-dim ...) (el-expr:t ...) : type))
+   ,(cons (term (A (num_cell-dim ...) (take/m (el-expr:t ...) num_cellsize)
+                   : (Array (S num_cell-dim ...) type_elt)))
+          ; drop one cell's elements from array, and split remaining elements
+          (term (cells/shape:t (num_cell-dim ...)
+                               (A (num_arr-dim ...)
+                                  (drop/m (el-expr:t ...) num_cellsize)
+                                  : type))))
+   (where (Array idx type_elt) (canonicalize-type type))
+   (where num_cellsize ,(foldr * 1 (term (num_cell-dim ...))))])
 
 ; select the unique element from a list that repeats only that element
 (define-metafunction Annotated
@@ -469,6 +561,13 @@
    ->Typed
    (term (annotate/cl ((A [2] [+ -]) (A [2 3] [1 2 3 4 5 6]) (A [2] [10 20])))))
   (term (annotate/cl (A [2 3] [11 12 13 -16 -15 -14]))))
+ 
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl ((A [] [(λ [(x (Array (S) Num))] x)])
+                       (A [6] [1 2 3 4 5 6])))))
+  (term (annotate/cl (A [6] [1 2 3 4 5 6]))))
  
  (check-equal?
   (term (annotate [][][] ((A [] [+]) (A Num [2] [1 3]) (A [] [4]))))
