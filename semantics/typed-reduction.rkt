@@ -115,7 +115,12 @@
                       : (canonicalize-type type_f)))
         (where (num_c0 ...) (unique-elt ((num_c ...) ...)))
         (where (any_v ...) ,(foldr append '() (term ((elt:t ...) ...))))
-        collapse]))
+        collapse]
+   [--> (in-hole E (T-APP (T-λ [var ...] expr:t : type_abst)
+                          type_arg ...
+                          : type_app))
+        (in-hole E (type/expr:t-sub ([var type_arg] ...) expr:t))
+        type-apply]))
 
 ;; grow argument arrays by duplication so they all have their desired ranks
 ;; cell ranks must be naturalized
@@ -566,6 +571,13 @@
   (deterministic-reduce
    ->Typed
    (term (annotate/cl ((A [] [(λ [(x (Array (S) Num))] x)])
+                       (A [6] [1 2 3 4 5 6])))))
+  (term (annotate/cl (A [6] [1 2 3 4 5 6]))))
+ 
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl ((T-APP (T-λ [l] (A [] [(λ [(x (Array (S) l))] x)])) Num)
                        (A [6] [1 2 3 4 5 6])))))
   (term (annotate/cl (A [6] [1 2 3 4 5 6]))))
  
