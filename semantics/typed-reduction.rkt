@@ -125,7 +125,14 @@
                           idx_arg ...
                           : type_app))
         (in-hole E (idx/expr:t-sub ([var idx_arg] ...) expr:t))
-        idx-apply]))
+        idx-apply]
+   [--> (in-hole E (UNPACK ([var_witness ... var_contents]
+                            ⇐ (PACK idx ... val:t : type_sum))
+                           expr:t_body : type_unpack))
+        (in-hole E (idx/expr:t-sub ([var_witness idx] ...)
+                                   (expr:t/expr:t-sub ([var_contents val:t])
+                                                      expr:t_body)))
+        unpack]))
 
 ;; grow argument arrays by duplication so they all have their desired ranks
 ;; cell ranks must be naturalized
@@ -311,6 +318,22 @@
    (where type (unique-type-of sort-env kind-env type-env
                                (I-APP expr idx ...)))]
   
+  [(annotate sort-env kind-env type-env (PACK idx ... expr type))
+   (PACK idx ... (annotate sort-env kind-env type-env expr) : type)]
+  [(annotate sort-env kind-env type-env (UNPACK ([var_witness ... var_contents]
+                                                 ⇐ expr_sum) expr_body))
+   (UNPACK ([var_witness ... var_contents]
+            ⇐ (annotate sort-env kind-env type-env expr_sum))
+           (annotate (sort-env-update [var_witness sort] ... sort-env)
+                     kind-env
+                     (type-env-update [var_contents type_contents] type-env)
+                     expr_body) : type_unpack)
+   (where type_unpack (unique-type-of sort-env kind-env type-env
+                                      (UNPACK ([var_witness ... var_contents]
+                                                 ⇐ expr_sum) expr_body)))
+   (where (Σ ([var sort] ...) type_contents)
+          (unique-type-of sort-env kind-env type-env expr_sum))]
+  
   [(annotate sort-env kind-env type-env (λ [(var type_arg) ...] expr))
    (λ [(var type_arg) ...]
      (annotate sort-env kind-env
@@ -492,7 +515,7 @@
           : (idx/type-sub idx-env type))]
   
   [(idx/expr:t-sub idx-env (PACK idx ... expr:t : type))
-   (PACK (idx/idx-sub idx) ... (idx/expr:t-sub idx-env expr:t)
+   (PACK (idx/idx-sub idx-env idx) ... (idx/expr:t-sub idx-env expr:t)
          : (idx/type-sub idx-env type))]
   [(idx/expr:t-sub idx-env (UNPACK ([var_witness ... var_contents] ⇐ expr:t_sum)
                                    expr:t_body : type))
@@ -606,6 +629,21 @@
                                             ((A [] [+]) (A [] [1]) x))])) 3)
                        (A [2 3] [20 30 40 500 600 700])))))
   (term (annotate/cl (A [2 3] [21 31 41 501 601 701]))))
+ 
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl (UNPACK ([a b x]
+                               ⇐ (PACK 3 2 ((A [] [+]) (A [3 2] [1 2 3 4 5 6])
+                                                       (A [] [2]))
+                                       (Σ ([a Nat] [b Nat])
+                                          (Array (S a b) Num))))
+                              (PACK a b ((A [] [+]) (A [] [1]) x)
+                                    (Σ ([a Nat] [b Nat])
+                                       (Array (S a b) Num)))))))
+  (term (annotate/cl (PACK 3 2 (A [3 2] [4 5 6 7 8 9])
+                           (Σ ([a Nat] [b Nat])
+                              (Array (S a b) Num))))))
  
  (check-equal?
   (term (annotate [][][] ((A [] [+]) (A Num [2] [1 3]) (A [] [4]))))
