@@ -69,13 +69,13 @@
    [--> (in-hole E ((A [num_f ...] [fun:t ...]
                        : (Array (S num_f ...) (type_arg ... -> type_ret)))
                     val:t ...
-                    : (Array (S num_f ...) type_app)))
+                    : (Array (S num_f ... num_c ...) type_app)))
         (in-hole E (A [num_f ...]
                       [((A [] [fun:t] : (Array (S) (type_arg ... -> type_ret)))
                         arr:t_cell ... : type_app/c) ...]
                       : (Array (S num_f ...) type_app/c)))
         (side-condition (< 0 (length (term (num_f ...)))))
-        (where type_app/c (canonicalize-type (Array (S) type_app)))
+        (where type_app/c (canonicalize-type (Array (S num_c ...) type_app)))
         (side-condition (term (equiv-type? (Array (S) type_ret) type_app/c)))
         (side-condition
          (term (all ((equiv-type? (extract-annotation val:t)
@@ -252,11 +252,11 @@
 ; use sort-of judgment to identify the unique sort that matches a given idx
 (define-metafunction Dependent
   unique-sort-of : sort-env idx -> sort or #f
-  [(unique-sort-of sort-env el-expr)
-   type_result
-   (where (type_result)
-          ,(judgment-holds (sort-of sort-env idx type)
-                           type))]
+  [(unique-sort-of sort-env idx)
+   sort_result
+   (where (sort_result)
+          ,(judgment-holds (sort-of sort-env idx sort)
+                           sort))]
   [(unique-sort-of sort-env idx) #f])
 
 ; add type annotations to convert from expr to expr:t
@@ -464,7 +464,7 @@
 ; substitute an index into an expr:t
 (define-metafunction Annotated
   idx/expr:t-sub : idx-env el-expr:t -> el-expr:t
-  [(idx/expr:t-sub idx-env (var : type)) (var : (idx/type-sub type))]
+  [(idx/expr:t-sub idx-env (var : type)) (var : (idx/type-sub idx-env type))]
   
   [(idx/expr:t-sub idx-env (expr:t_fun expr:t_arg ... : type))
    ((idx/expr:t-sub idx-env expr:t_fun)
@@ -472,40 +472,43 @@
     : (idx/type-sub idx-env type))]
   
   [(idx/expr:t-sub idx-env (A type_elt (num ...) (el-expr:t ...) : type))
-   (A (idx/type-sub type_elt)
-      (num ...) ((idx/expr:t-sub el-expr:t) ...) : (idx/type-sub type))]
+   (A (idx/type-sub idx-env type_elt)
+      (num ...) ((idx/expr:t-sub idx-env el-expr:t) ...)
+      : (idx/type-sub idx-env type))]
   [(idx/expr:t-sub idx-env (A (num ...) (el-expr:t ...) : type))
-   (A (num ...) ((idx/expr:t-sub el-expr:t) ...) : (idx/type-sub type))]
+   (A (num ...) ((idx/expr:t-sub idx-env el-expr:t) ...)
+      : (idx/type-sub idx-env type))]
   
   [(idx/expr:t-sub idx-env (T-λ [var ...] expr:t : type))
-   (T-λ [var ...] (idx/expr:t-sub idx-env expr:t) : (idx/type-sub type))]
+   (T-λ [var ...] (idx/expr:t-sub idx-env expr:t)
+        : (idx/type-sub idx-env type))]
   [(idx/expr:t-sub idx-env (T-APP expr:t type_arg ... : type))
-   (T-APP (idx/expr:t-sub idx-env expr:t) (idx/type-sub type_arg) ...
-          : (idx/type-sub type))]
+   (T-APP (idx/expr:t-sub idx-env expr:t) (idx/type-sub idx-env type_arg) ...
+          : (idx/type-sub idx-env type))]
   
   [(idx/expr:t-sub idx-env (PACK idx ... expr:t : type))
    (PACK (idx/idx-sub idx) ... (idx/expr:t-sub idx-env expr:t)
-         : (idx/type-sub type))]
+         : (idx/type-sub idx-env type))]
   [(idx/expr:t-sub idx-env (UNPACK ([var_witness ... var_contents] ⇐ expr:t_sum)
                                    expr:t_body : type))
    (UNPACK ([var_witness ... var_contents]
             ⇐ (idx/expr:t-sub idx-env expr:t_sum))
            (idx/expr:t-sub idx-env expr:t_body)
-           : (idx/type-sub type))]
+           : (idx/type-sub idx-env type))]
   
   [(idx/expr:t-sub idx-env (I-λ [(var sort) ...] expr:t : type))
    (I-λ [(var sort) ...] (idx/expr:t-sub (shadow (var ...) idx-env) expr:t)
-        : (idx/type-sub type))]
+        : (idx/type-sub idx-env type))]
   [(idx/expr:t-sub idx-env (I-APP expr:t idx ... : type))
    (I-APP (idx/expr:t-sub idx-env expr:t) (idx/idx-sub idx) ...
-          : (idx/type-sub type))]
+          : (idx/type-sub idx-env type))]
   
   [(idx/expr:t-sub idx-env op) op]
   [(idx/expr:t-sub idx-env base) base]
   [(idx/expr:t-sub idx-env (λ [(var type_arg) ...] expr:t : type_fun))
    (λ [(var (idx/type-sub idx-env type_arg)) ...]
      (idx/expr:t-sub idx-env expr:t)
-     : (idx/type-sub type-env type_fun))])
+     : (idx/type-sub idx-env type_fun))])
 
 ; like using traces with ->Typed, but hide the type annotations
 (define (simple-trace t)
