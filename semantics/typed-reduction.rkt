@@ -120,7 +120,12 @@
                           type_arg ...
                           : type_app))
         (in-hole E (type/expr:t-sub ([var type_arg] ...) expr:t))
-        type-apply]))
+        type-apply]
+   [--> (in-hole E (I-APP (I-λ [(var sort) ...] expr:t : type_abst)
+                          idx_arg ...
+                          : type_app))
+        (in-hole E (idx/expr:t-sub ([var idx_arg] ...) expr:t))
+        idx-apply]))
 
 ;; grow argument arrays by duplication so they all have their desired ranks
 ;; cell ranks must be naturalized
@@ -583,6 +588,24 @@
    (term (annotate/cl ((T-APP (T-λ [l] (A [] [(λ [(x (Array (S) l))] x)])) Num)
                        (A [6] [1 2 3 4 5 6])))))
   (term (annotate/cl (A [6] [1 2 3 4 5 6]))))
+ 
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl ((I-APP (I-λ [(n Nat)]
+                                   (A [] [(λ [(x (Array (S n) Num))]
+                                            ((A [] [+]) (A [] [1]) x))])) 3)
+                       (A [3] [20 30 40])))))
+  (term (annotate/cl (A [3] [21 31 41]))))
+ 
+ (check-equal?
+  (deterministic-reduce
+   ->Typed
+   (term (annotate/cl ((I-APP (I-λ [(n Nat)]
+                                   (A [] [(λ [(x (Array (S n) Num))]
+                                            ((A [] [+]) (A [] [1]) x))])) 3)
+                       (A [2 3] [20 30 40 500 600 700])))))
+  (term (annotate/cl (A [2 3] [21 31 41 501 601 701]))))
  
  (check-equal?
   (term (annotate [][][] ((A [] [+]) (A Num [2] [1 3]) (A [] [4]))))

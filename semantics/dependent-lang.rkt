@@ -176,12 +176,12 @@
   
   ; index app: check that indices have proper sort, substitute indices into type
   [(type-of sort-env kind-env type-env expr
-            (Array idx_prod (Π ([var sort] ...) type)))
-   (sort-of sort-env idx_prod Shape)
+            (Π ([var sort] ...) type))
+   ;(sort-of sort-env idx_prod Shape)
    (sort-of sort-env idx_arg sort) ...
    --- idx-app
    (type-of sort-env kind-env type-env (I-APP expr idx_arg ...)
-            (Array idx_prod (idx/type-sub ([var idx_arg] ...) type)))]
+            (idx/type-sub ([var idx_arg] ...) type))]
   
   ; projection from dependent sum
   [(type-of sort-env kind-env type-env
@@ -308,7 +308,7 @@
   [(frame-contribution (Array (S) type) (Array idx_1 (Array idx_2 type)))
    (Array idx_1 (Array idx_2 hole))]
   [(frame-contribution (Array (S idx_0 ...) type)
-                       (Array (S idx_0 ... idx_1 ...) type))
+                       (Array (S idx_1 ... idx_0 ...) type))
    (Array (S idx_1 ...) hole)])
 
 ; find the frame-struct that is prefixed by all other frame-structs in the list
@@ -957,10 +957,10 @@
   (judgment-holds
    (type-of [] [] [(op (Π ([d1 Nat]) ((Array (S d1) Num)
                                       -> (Array (S 1 d1) Num))))]
-            (I-APP (A () [op]) 3)
+            (I-APP op 3)
             type)
    type)
-  (term ((Array (S) [(Array (S 3) Num) -> (Array (S 1 3) Num)]))))
+  (term (((Array (S 3) Num) -> (Array (S 1 3) Num)))))
  
  
  ; index abstraction
