@@ -39,7 +39,7 @@
   ; have to include type annotations in λ syntax
   (fun (λ [(var type) ...] expr)
        op
-       c-op)
+       #;c-op)
   
   ; type-level pieces
   (type (Π [(var sort) ...] type)
@@ -403,6 +403,12 @@
                     (Array (S) Num)
                     -> (Array (S) Num))]
   [(primop-type -) ((Array (S) Num)
+                    (Array (S) Num)
+                    -> (Array (S) Num))]
+  [(primop-type *) ((Array (S) Num)
+                    (Array (S) Num)
+                    -> (Array (S) Num))]
+  [(primop-type /) ((Array (S) Num)
                     (Array (S) Num)
                     -> (Array (S) Num))])
 

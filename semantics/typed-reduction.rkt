@@ -29,6 +29,19 @@
          fun:t)
   (fun:t op
          (λ [(var type) ...] expr:t : type))
+  (op + - * /
+      < > <= >= =
+      and or not
+      exp log
+      (I-APP (T-APP reshape type) idx idx)
+      head behead tail curtail
+      (I-APP iota idx)
+      (I-APP (T-APP append type) idx idx idx)
+      (I-APP (T-APP itemize type) idx)
+      (I-APP (T-APP length type) idx idx)
+      reduce
+      fold/r
+      fold/l)
   
   (expr:t-env (e:t-bind ...)) (e:t-bind [var expr:t])
   
