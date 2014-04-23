@@ -93,8 +93,8 @@
         (side-condition
          (term (all ((equiv-type? (extract-annotation val:t)
                                   (Array (S num_f ...) type_arg)) ...))))
-        (where ((Array idx_c type_argelt) ...) (type_arg ...))
-        (where (S num_c ...) (unique-elt (idx_c ...)))
+        (where (Array (S num_c ...) type_retatom)
+               (canonicalize-type (Array (S) type_ret)))
         (where ((arr:t_cell ...) ...)
                (transpose/m
                 ((cells/shape:t (num_c ...) val:t) ...)))
@@ -126,7 +126,11 @@
                       : type_f))
         (in-hole E (A [num_f ... num_c0 ...] [any_v ...]
                       : (canonicalize-type type_f)))
-        (where (num_c0 ...) (unique-elt ((num_c ...) ...)))
+        (where (Array (S num_f ... num_c0 ...) type_atom)
+               (canonicalize-type type_f))
+        (side-condition (or (< 0 (length (term [type_c ...])))
+                            (< 0 (length (term (num_c0 ...))))))
+        #;(where (num_c0 ...) (unique-elt ((num_c ...) ...)))
         (where (any_v ...) ,(foldr append '() (term ((elt:t ...) ...))))
         collapse]
    [--> (in-hole E (T-APP (T-λ [var ...] expr:t : type_abst)
