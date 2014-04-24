@@ -3,6 +3,8 @@
 (require racket/list
          racket/vector
          racket/sequence)
+(module+ test
+  (require rackunit))
 (define debug-mode (make-parameter #f))
 
 ;;;-------------------------------------
@@ -133,9 +135,18 @@
 (define-struct rem-array (shape data)
   #:transparent
   #:property prop:procedure apply-rem-array)
+(module+ test
+  (define array-ex:scalar1 (rem-array #() #(4)))
+  (define array-ex:scalar2 (rem-array #() #(2)))
+  (define array-ex:vector1 (rem-array #(2) #(10 20)))
+  (define array-ex:matrix1 (rem-array #(2 3) #(1 2 3 4 5 6))))
 
 ;; Find the rank of a Remora array
 (define (rem-array-rank arr) (vector-length (rem-array-shape arr)))
+(module+ test
+  (check-equal? 0 (rem-array-rank array-ex:scalar1))
+  (check-equal? 1 (rem-array-rank array-ex:vector1))
+  (check-equal? 2 (rem-array-rank array-ex:matrix1)))
 
 
 ;; Apply a Remora procedure (for internal convenience)
@@ -150,6 +161,12 @@
   #:transparent
   ; may decide to drop this part
   #:property prop:procedure apply-rem-proc)
+(module+ test
+  (define R+ (rem-scalar-proc + 2))
+  (define R- (rem-scalar-proc - 2))
+  (define R* (rem-scalar-proc * 2))
+  (check-equal? (R+ array-ex:scalar1 array-ex:scalar2)
+                (rem-array #() #(6))))
 
 ;; A partially-erased Remora type is one of
 ;; - a (rem-type-append some-shape-idx some-rem-type)
@@ -158,6 +175,15 @@
   #:transparent)
 (define (rem-type? x) (or (rem-type-append? x)
                           (equal? 'scalar x)))
+(module+ test
+  (define type-2:s (rem-type-append (shape-idx #(2)) 'scalar))
+  (define type-2x3:s (rem-type-append (shape-idx #(2 3)) 'scalar))
+  (define type-2:3:s (rem-type-append (shape-idx #(2))
+                                      (rem-type-append (shape-idx #(3))
+                                                       'scalar)))
+  (check-true (rem-type? type-2x3:s))
+  (check-true (rem-type? 'scalar))
+  (check-false (rem-type? (shape-idx #(2)))))
 
 ;; Convert a Remora procedure's expected cell type to an expected cell rank
 (define (type->rank type)
@@ -165,6 +191,10 @@
         [(rem-type-append? type)
          (+ (vector-length (shape-idx-dims (rem-type-append-head type)))
             (type->rank (rem-type-append-tail type)))]))
+(module+ test
+  (check-equal? (type->rank type-2:s) 1)
+  (check-equal? (type->rank type-2x3:s) 2)
+  (check-equal? (type->rank type-2:3:s) 2))
 
 ;; A Remora index is one of
 ;; - a Nat index, which wraps a natural number
@@ -178,6 +208,11 @@
 ;; Consumes nat-idx arguments, produces a nat-idx
 (define (idx+ . xs)
   (nat-idx (apply + (map nat-idx-num xs))))
+(module+ test
+  (check-equal? (idx+ (nat-idx 3) (nat-idx 5))
+                (nat-idx 8))
+  (check-equal? (idx+ (nat-idx 1) (nat-idx 2) (nat-idx 3))
+                (nat-idx 6)))
 
 ;; A Remora box (dependent sum) has
 ;; - contents, a Remora value
@@ -198,11 +233,22 @@
        (for/and ([a seq1] [b seq2])
          (equal? a b))
        (if (> (sequence-length seq1) (sequence-length seq2)) seq1 seq2)))
+(module+ test
+  (check-equal? (prefix-max #(3 4) #(3 4)) #(3 4))
+  (check-equal? (prefix-max #(3 4) #(3 4 9)) #(3 4 9))
+  (check-equal? (prefix-max #(3 4 2) #(3 4)) #(3 4 2))
+  (check-equal? (prefix-max #(3) #(3 4)) #(3 4))
+  (check-equal? (prefix-max #(3 2) #(3 4)) #f)
+  (check-equal? (prefix-max #(3 2) #(3 4 5)) #f))
 
 
 ;; Extract a contiguous piece of a vector
 (define (subvector vec offset size)
   (vector-take (vector-drop vec offset) size))
+(module+ test
+  (check-equal? (subvector #(2 4 6 3 5 7) 1 3) #(4 6 3))
+  (check-equal? (subvector #(2 4 6 3 5 7) 4 2) #(5 7))
+  (check-equal? (subvector #(2 4 6 3 5 7) 4 0) #()))
 
 
 ;; Express a number in a given radix sequence
@@ -215,6 +261,19 @@
   (rest (antibase-internal radix num)))
 
 
+
+;; tests for array application
+;; TODO: test array application for functions that consume/produce non-scalars
+(module+ test
+  (check-equal? ((scalar R+) (scalar 3) (scalar 4))
+                (scalar 7))
+  (check-equal? ((scalar R+) (rem-array #(2 3) #(1 2 3 4 5 6))
+                             (rem-array #(2) #(10 20)))
+                (rem-array #(2 3) #(11 12 13 24 25 26)))
+  (check-equal? ((rem-array #(2) (vector R+ R-))
+   (rem-array #(2 3) #(1 2 3 4 5 6))
+   (rem-array #(2) #(10 20)))
+                (rem-array #(2 3) #(11 12 13 -16 -15 -14))))
 
 ;;;-------------------------------------
 ;;; Integration utilities
