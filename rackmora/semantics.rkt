@@ -3,6 +3,7 @@
 (require racket/list
          racket/vector
          racket/sequence)
+(define debug-mode (make-parameter #f))
 
 ;;;-------------------------------------
 ;;; Internal use structures:
@@ -37,7 +38,7 @@
              (equal? p (first individual-exp-ranks)))
            (first individual-exp-ranks)]
           [else (error "Could not identify expected rank for function" fun)]))
-  (printf "expected-rank = ~v\n" expected-rank)
+  (when (debug-mode) (printf "expected-rank = ~v\n" expected-rank))
   
   ; find principal frame shape
   (define principal-frame
@@ -51,29 +52,32 @@
                (cons (rem-array-shape fun)
                      (for/list ([arr array-args]
                                 [r expected-rank])
-                       (vector-drop-right (rem-array-shape arr) r)))
-               #;(for/vector [(arr array-args)]
-                   (rem-array-rank arr))
-               #;expected-rank)))
-  (printf "principal-frame = ~v\n" principal-frame)
+                       (vector-drop-right (rem-array-shape arr) r))))))
+  (when (debug-mode) (printf "principal-frame = ~v\n" principal-frame))
   
   ; compute argument cell sizes
   (define cell-sizes
     (for/list ([arr array-args]
                [r expected-rank])
       (sequence-fold * 1 (vector-take-right (rem-array-shape arr) r))))
-  (printf "cell-sizes = ~v\n" cell-sizes)
+  (when (debug-mode) (printf "cell-sizes = ~v\n" cell-sizes))
   
   ; compute argument frame sizes
   (define frame-sizes
     (for/list ([arr array-args]
                [r expected-rank])
       (sequence-fold * 1 (vector-drop-right (rem-array-shape arr) r))))
-  (printf "frame-sizes = ~v\n" frame-sizes)
+  (when (debug-mode) (printf "frame-sizes = ~v\n" frame-sizes))
   
   ; compute each result cell
   (define result-cells
     (for/vector ([cell-id (sequence-fold * 1 principal-frame)])
+      (when (debug-mode)
+        (printf
+         "using function cell ~v\n"
+         (quotient cell-id
+                   (quotient (sequence-fold * 1 principal-frame)
+                             (sequence-fold * 1 (rem-array-shape fun))))))
       (apply
        (vector-ref
         (rem-array-data fun)
@@ -90,10 +94,8 @@
                      (quotient cell-id
                                (quotient (sequence-fold * 1 principal-frame)
                                          fsize))
-                     csize))
-         #;(take (antibase (vector->list principal-frame) cell-id)
-                 (rem-array-rank arr))))))
-  (printf "result-cells = ~v\n" result-cells)
+                     csize))))))
+  (when (debug-mode) (printf "result-cells = ~v\n" result-cells))
   
   ; determine final result shape
   (define final-shape
@@ -114,14 +116,14 @@
                       (rem-array-shape (vector-ref result-cells 0)))]
       [else (error "Result cells have mismatched shapes: ~v" result-cells)])
     )
-  (printf "final-shape = ~v\n" final-shape)
+  (when (debug-mode) (printf "final-shape = ~v\n" final-shape))
   
   ; determine final result data: all result cells' data vectors concatenated
   (define final-data
     (apply vector-append
            (for/list ([r result-cells])
              (rem-array-data r))))
-  (printf "final-data = ~v\n" final-data)
+  (when (debug-mode) (printf "final-data = ~v\n" final-data))
   
   (rem-array final-shape final-data))
 
@@ -223,7 +225,7 @@
               (rem-array
                #()
                (vector
-                (apply + (for/list [(a args)]
+                (apply p (for/list [(a args)]
                            (vector-ref (rem-array-data a) 0))))))
             (for/list [(i arity)] 'scalar)))
 
