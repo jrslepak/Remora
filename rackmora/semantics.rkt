@@ -93,7 +93,7 @@
          (rem-array
           (vector-take-right (rem-array-shape arr) r)
           (subvector (rem-array-data arr)
-                     (quotient cell-id
+                     (quotient (* cell-id csize)
                                (quotient (sequence-fold * 1 principal-frame)
                                          fsize))
                      csize))))))
@@ -110,14 +110,13 @@
       ; empty frame -> use annotated shape
       ; TODO: should maybe check for mismatch between annotated and actual
       ;       (i.e. frame-shape ++ cell-shape) result shapes
-      [(equal? 0 (vector-length result-cells)) result-shape]
+      [(equal? 0 (vector-length result-cells)) (shape-idx-dims result-shape)]
       [(for/and ([c result-cells])
          (equal? (rem-array-shape (vector-ref result-cells 0))
                  (rem-array-shape c)))
        (vector-append principal-frame
                       (rem-array-shape (vector-ref result-cells 0)))]
-      [else (error "Result cells have mismatched shapes: ~v" result-cells)])
-    )
+      [else (error "Result cells have mismatched shapes: ~v" result-cells)]))
   (when (debug-mode) (printf "final-shape = ~v\n" final-shape))
   
   ; determine final result data: all result cells' data vectors concatenated
