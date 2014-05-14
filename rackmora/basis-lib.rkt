@@ -3,7 +3,12 @@
 (require "semantics.rkt"
          "syntax.rkt"
          racket/math
-         racket/vector)
+         racket/vector
+         racket/list)
+(module+ test
+  (require rackunit))
+
+(define R_id (rem-scalar-proc (λ (x) x) 1))
 
 (define R_+ (rem-scalar-proc + 2))
 (define R_- (rem-scalar-proc - 2))
@@ -62,6 +67,10 @@
 (define (shape-idx->product idx)
   (for/product ([d (shape-idx->list idx)]) d))
 
+; head, tail, behead, curtail really consume an arg with major axis length + 1,
+; but the Nat index argument is effectively irrelevant
+; "cell-shape" here refers to the -1-cells which will be pushed around
+; "length" is how many -1-cells there are
 (define R_head
   (Iλ ([cell-shape 'Shape]
        [length 'Nat])
@@ -70,6 +79,12 @@
                      (vector->immutable-vector
                       (vector-take (rem-array-data arr)
                                    (shape-idx->product cell-shape)))))))
+(module+ test
+  (check-equal?
+   ((rem-array #() (vector-immutable (R_head 'scalar 4)))
+     (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
+   (rem-array #(4) #(0 3 6 9))))
+
 (define R_tail
   (Iλ ([cell-shape 'Shape]
        [length 'Nat])
@@ -78,25 +93,92 @@
                      (vector->immutable-vector
                       (vector-take-right (rem-array-data arr)
                                          (shape-idx->product cell-shape)))))))
+(module+ test
+  (check-equal?
+   ((rem-array #() (vector-immutable (R_tail 'scalar 4)))
+     (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
+   (rem-array #(4) #(2 5 8 11))))
+
 (define R_behead
   (Iλ ([cell-shape 'Shape]
        [length 'Nat])
       (Rλ ([arr (rem-type-append (shape length) cell-shape)])
+          #;(printf "shape: ~v\ndata: ~v\n"
+                  (list->vector
+                   (cons (sub1 length)
+                         (shape-idx->list cell-shape)))
+                  (vector-drop (rem-array-data arr)
+                               (shape-idx->product cell-shape)))
           (rem-array (vector->immutable-vector
                       (list->vector
-                       (cons (sub1 length)
+                       (cons (sub1 (vector-ref (rem-array-shape arr) 0))
                              (shape-idx->list cell-shape))))
                      (vector->immutable-vector
                       (vector-drop (rem-array-data arr)
                                    (shape-idx->product cell-shape)))))))
+(module+ test
+  (check-equal?
+   ((rem-array #() (vector-immutable (R_behead 'scalar 4)))
+     (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
+   (rem-array #(4 2) #(1 2 4 5 7 8 10 11))))
+
 (define R_curtail
   (Iλ ([cell-shape 'Shape]
        [length 'Nat])
       (Rλ ([arr (rem-type-append (shape length) cell-shape)])
           (rem-array (vector->immutable-vector
                       (list->vector
-                       (cons (sub1 length)
+                       (cons (sub1 (vector-ref (rem-array-shape arr) 0))
                              (shape-idx->list cell-shape))))
                      (vector->immutable-vector
                       (vector-drop-right (rem-array-data arr)
                                          (shape-idx->product cell-shape)))))))
+(module+ test
+  (check-equal?
+   ((rem-array #() (vector-immutable (R_curtail 'scalar 4)))
+     (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
+   (rem-array #(4 2) #(0 1 3 4 6 7 9 10))))
+
+
+(define (array->cell-list arr cell-rank)
+  (define nat-cell-rank
+    (if (>= cell-rank 0)
+        cell-rank
+        (+ (rem-array-rank arr) cell-rank)))
+  (define frame-shape (vector-drop-right (rem-array-shape arr) nat-cell-rank))
+  (define cell-count (for/product ([d frame-shape]) d))
+  (define cell-shape (vector-take-right (rem-array-shape arr) nat-cell-rank))
+  (define cell-size
+    (for/product ([d cell-shape]) d))
+  (for/list ([i cell-count])
+    (rem-array cell-shape (subvector (rem-array-data arr)
+                                     (* i cell-size)
+                                     cell-size))))
+(module+ test
+  (check-equal?
+   (array->cell-list (rem-array #(3 2 4) (for/vector ([i 24]) i)) 0)
+   (for/list ([i 24]) (rem-array #() (vector i))))
+  (check-equal?
+   (array->cell-list (rem-array #(3 2 4) (for/vector ([i 24]) i)) 1)
+   (for/list ([i 6]) (rem-array #(4) (for/vector ([j 4]) (+ j (* 4 i))))))
+  (check-equal?
+   (array->cell-list (rem-array #(3 2 4) (for/vector ([i 24]) i)) 2)
+   (for/list ([i 3]) (rem-array #(2 4) (for/vector ([j 8]) (+ j (* 8 i)))))))
+
+(define (cell-list->array arrs frame-shape [opt-cell-shape #f])
+  (define cell-shape (or opt-cell-shape (rem-array-shape (first arrs))))
+  (rem-array (vector-append frame-shape cell-shape)
+             (apply vector-append (map rem-array-data arrs))))
+
+(define (shape->vector s)
+  (cond [(shape-idx? s) (vector->immutable-vector (shape-idx-dims s))]
+        [(equal? 'scalar s) #()]
+        [else s]))
+
+(define R_reverse
+  (Iλ ([cell-shape 'Shape]
+       [length 'Nat])
+      (Rλ ([arr (rem-type-append (shape length) cell-shape)])
+          (cell-list->array (reverse (array->cell-list arr -1))
+                            (vector length)
+                            (shape->vector cell-shape)))))
