@@ -6,7 +6,7 @@
                      syntax/parse
                      racket/base))
 
-(provide Iλ IApp Rλ)
+(provide Iλ IApp Rλ check-sort)
 
 
 
@@ -23,11 +23,17 @@
     (pattern #'Nat)
     (pattern #'Shape)))
 
+(define (check-sort i s)
+  (define well-sorted?
+    (cond [(equal? 'Nat s) (nat-idx? i)]
+          [(equal? 'Shape s) (shape-idx? i)]
+          [else (error "invalid index sort: " s)]))
+  (unless well-sorted? (error "index does not match sort: " i s)))
 
 (define-syntax (Iλ stx)
   (syntax-parse stx
     [(_ ((var:id sort:isort) ...) body ...+)
-     #'(λ (var ...) body ...)]))
+     #'(λ (var ...) (check-sort var sort) ... body ...)]))
 
 (define-syntax (IApp stx)
   (syntax-parse stx

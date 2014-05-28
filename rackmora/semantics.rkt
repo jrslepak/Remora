@@ -86,7 +86,11 @@
     (for/vector ([cell-id (sequence-fold * 1 principal-frame)])
       (when (debug-mode)
         (printf
-         "using function cell ~v\n"
+         "using function cell ~v\n taken from ~v :: ~v\n"
+         (quotient cell-id
+                   (quotient (sequence-fold * 1 principal-frame)
+                             (sequence-fold * 1 (rem-array-shape fun))))
+         (rem-array-data fun)
          (quotient cell-id
                    (quotient (sequence-fold * 1 principal-frame)
                              (sequence-fold * 1 (rem-array-shape fun))))))
@@ -101,8 +105,9 @@
                   [fsize frame-sizes]
                   [r expected-rank])
          (when (debug-mode)
-           (printf "  arg cell #~v, csize ~v, pfr ~v, fr ~v -- ~v\n"
-                   cell-id csize (sequence-fold * 1 principal-frame) fsize
+           (printf "  arg cell #~v, csize ~v, pfr ~v, fr ~v"
+                   cell-id csize (sequence-fold * 1 principal-frame) fsize)
+           (printf " -- ~v\n"
                    (rem-array
                     (vector-take-right (rem-array-shape arr) r)
                     (subvector (rem-array-data arr)
@@ -151,9 +156,9 @@
   
   (rem-array final-shape final-data))
 
-;; Contract constructor for immutable vectors of specified length
+;; Contract constructor for vectors of specified length
 (define ((vector-length/c elts len) vec)
-  (and ((vectorof elts #:immutable #t) vec)
+  (and ((vectorof elts #:flat? #t) vec)
        (equal? (vector-length vec) len)))
 
 ;; A Remora array has
@@ -165,13 +170,13 @@
       ([shape (vectorof exact-nonnegative-integer? #:immutable #t)]
        [data (vectorof any #:immutable #t)])
       #:omit-constructor)
-  (rem-array (->i ([shape (vectorof exact-nonnegative-integer? #:immutable #t)]
+  (rem-array (->i ([shape (vectorof exact-nonnegative-integer?)]
                    [data (shape) (vector-length/c
                                   any/c
                                   (for/product ([dim shape]) dim))])
                   [result any/c]))
   (rem-array-shape (-> rem-array?
-                       (vectorof exact-nonnegative-integer? #:immutable #t)))
+                       (vectorof exact-nonnegative-integer?)))
   (rem-array-data  (-> rem-array?
                        (vectorof any/c)))
   (rem-array? (-> any/c boolean?))))
@@ -313,8 +318,13 @@
 
 
 ;; Extract a contiguous piece of a vector
+(provide
+ (contract-out (subvector (-> (vectorof any/c)
+                              exact-nonnegative-integer?
+                              exact-nonnegative-integer?
+                              (vectorof any/c)))))
 (define (subvector vec offset size)
-  (vector-take (vector-drop vec offset) size))
+  (vector->immutable-vector (vector-take (vector-drop vec offset) size)))
 (module+ test
   (check-equal? (subvector #(2 4 6 3 5 7) 1 3) #(4 6 3))
   (check-equal? (subvector #(2 4 6 3 5 7) 4 2) #(5 7))
