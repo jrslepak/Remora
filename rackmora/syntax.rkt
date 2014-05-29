@@ -6,7 +6,7 @@
                      syntax/parse
                      racket/base))
 
-(provide Iλ IApp Rλ check-sort)
+(provide Rλ)
 
 
 
@@ -23,29 +23,10 @@
     (pattern #'Nat)
     (pattern #'Shape)))
 
-(define (check-sort i s)
-  (define well-sorted?
-    (cond [(equal? 'Nat s) (nat-idx? i)]
-          [(equal? 'Shape s) (shape-idx? i)]
-          [else (error "invalid index sort: " s)]))
-  (unless well-sorted? (error "index does not match sort: " i s)))
-
-(define-syntax (Iλ stx)
-  (syntax-parse stx
-    [(_ ((var:id sort:isort) ...) body ...+)
-     #'(λ (var ...) (check-sort var sort) ... body ...)]))
-
-(define-syntax (IApp stx)
-  (syntax-parse stx
-    [(_ fun:expr arg:idx ...)
-     #'(fun arg ...)]))
 
 (define-syntax (Rλ stx)
   (syntax-parse stx
-    [(_ ((var:id type:expr) ...) body ...+)
+    [(_ ((var:id rank:expr) ...) body ...+)
     #'(rem-proc (λ (var ...) body ...)
-                 (list type ...))]))
+                 (list rank ...))]))
 
-;; TODO: whole-module binding check ("for now," can just assume everything's OK)
-;; local-expand the module to Racket core forms plus Iλ and IApp
-;; how to deal with imported Remora functions?

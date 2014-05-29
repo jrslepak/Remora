@@ -13,34 +13,31 @@
 ;;; Internal use structures:
 ;;;-------------------------------------
 
-;; TODO: what about passing the result shape annotation as a keyword argument?
 ;; Apply a Remora array (in Remora, an array may appear in function position)
-(define (apply-rem-array fun . args)
+(define (apply-rem-array fun
+                         #:result-shape [result-shape 'no-annotation]
+                         . args)
   ; check whether the data portion of fun is Remora procedures
   (unless (for/and [(p (rem-array-data fun))] (rem-proc? p))
     (error "Array in function position must contain only Remora functions" fun))
   
-  ; if last arg is a shape, split it off; args - last are the actual array args
-  ;    otherwise args are the array args,
-  ;              and result-shape should be something representing "not a shape"
-  (define-values (array-args result-shape)
-    (cond [(empty? args) (values '() 'no-annotation)]
-          [(shape-idx? (last args)) (values (drop-right args 1) (last args))]
-          [else (values args 'no-annotation)]))
   (when (debug-mode) (printf "Result shape is ~v\n" result-shape))
   
-  ; check whether array-args actually are Remora arrays
-  (unless (for/and [(arr array-args)] (rem-array? arr))
-    (error "Remora arrays can only by applied to Remora arrays" fun array-args))
+  ; check whether args actually are Remora arrays
+  (unless (for/and [(arr args)] (rem-array? arr))
+    (error "Remora arrays can only by applied to Remora arrays" fun args))
   (when (debug-mode) (printf "checked for Remora array arguments\n"))
   
   ; identify expected argument cell ranks
   (define individual-exp-ranks
     (for/list [(p (rem-array-data fun))]
       (when (debug-mode) (printf "checking expected ranks for ~v\n" p))
-      (for/vector [(t (rem-proc-type p))]
+      (for/vector [(t (rem-proc-ranks p))
+                   (arr args)]
         (when (debug-mode) (printf " - ~v\n" t))
-        (type->rank t))))
+        (if (equal? 'all t)
+            (rem-array-rank arr)
+            t))))
   (when (debug-mode) (printf "individual expected ranks are ~v\n"
                              individual-exp-ranks))
   (define expected-rank
@@ -55,28 +52,28 @@
   ; find principal frame shape
   (define principal-frame
     (or (for/fold ([max-frame (rem-array-shape fun)])
-          ([arr array-args]
+          ([arr args]
            [r expected-rank])
           (prefix-max 
            (vector-drop-right (rem-array-shape arr) r)
            max-frame))
         (error "Incompatible argument frames"
                (cons (rem-array-shape fun)
-                     (for/list ([arr array-args]
+                     (for/list ([arr args]
                                 [r expected-rank])
                        (vector-drop-right (rem-array-shape arr) r))))))
   (when (debug-mode) (printf "principal-frame = ~v\n" principal-frame))
   
   ; compute argument cell sizes
   (define cell-sizes
-    (for/list ([arr array-args]
+    (for/list ([arr args]
                [r expected-rank])
       (sequence-fold * 1 (vector-take-right (rem-array-shape arr) r))))
   (when (debug-mode) (printf "cell-sizes = ~v\n" cell-sizes))
   
   ; compute argument frame sizes
   (define frame-sizes
-    (for/list ([arr array-args]
+    (for/list ([arr args]
                [r expected-rank])
       (sequence-fold * 1 (vector-drop-right (rem-array-shape arr) r))))
   (when (debug-mode) (printf "frame-sizes = ~v\n" frame-sizes))
@@ -100,7 +97,7 @@
         (quotient cell-id
                   (quotient (sequence-fold * 1 principal-frame)
                             (sequence-fold * 1 (rem-array-shape fun)))))
-       (for/list ([arr array-args]
+       (for/list ([arr args]
                   [csize cell-sizes]
                   [fsize frame-sizes]
                   [r expected-rank])
@@ -134,11 +131,11 @@
       [(and (equal? result-shape 'no-annotation)
             (equal? 0 (vector-length result-cells)))
        (error "Empty frame with no shape annotation: ~v applied to ~v"
-              fun array-args)]
+              fun args)]
       ; empty frame -> use annotated shape
       ; TODO: should maybe check for mismatch between annotated and actual
       ;       (i.e. frame-shape ++ cell-shape) result shapes
-      [(equal? 0 (vector-length result-cells)) (shape-idx-dims result-shape)]
+      [(equal? 0 (vector-length result-cells)) result-shape]
       [(for/and ([c result-cells])
          (equal? (rem-array-shape (vector-ref result-cells 0))
                  (rem-array-shape c)))
@@ -205,13 +202,17 @@
 (define (apply-rem-proc fun . args)
   (apply (rem-proc-body fun) args))
 
+;; A valid expected rank is either a natural number or 'all
+(define (rank? r)
+  (or (exact-nonnegative-integer? r) (equal? 'all r)))
+
 ;; A Remora procedure has
 ;; - body, a Racket procedure which consumes and produces Remora arrays
-;; - type, a list of partly-erased Remora type describing the procedure's
-;;     expected argument shapes
+;; - ranks, a list of the procedure's expected argument ranks
 (provide
- (contract-out (struct rem-proc ([body procedure?] [type (listof rem-type?)]))))
-(define-struct rem-proc (body type)
+ (contract-out (struct rem-proc ([body procedure?]
+                                 [ranks (listof rank?)]))))
+(define-struct rem-proc (body ranks)
   #:transparent
   ; may decide to drop this part -- it seems to hide a common error:
   ;   using (R+ arr1 arr2) instead of ([scalar R+] arr1 arr2) means no lifting
@@ -223,82 +224,14 @@
   (check-equal? (R+ array-ex:scalar1 array-ex:scalar2)
                 (rem-array #() #(6))))
 
-;; A partially-erased Remora type is one of
-;; - a (rem-type-append some-shape-idx some-rem-type)
-;; - 'scalar
-(provide
- (contract-out (struct rem-type-append ([head shape-idx] [tail rem-type?]))))
-(define-struct rem-type-append (head tail)
-  #:transparent)
-(provide
- (contract-out (rem-type? (-> any/c boolean?))))
-(define (rem-type? x) (or (rem-type-append? x)
-                          (equal? 'scalar x)))
-(module+ test
-  (define type-2:s (rem-type-append (shape-idx #(2)) 'scalar))
-  (define type-2x3:s (rem-type-append (shape-idx #(2 3)) 'scalar))
-  (define type-2:3:s (rem-type-append (shape-idx #(2))
-                                      (rem-type-append (shape-idx #(3))
-                                                       'scalar)))
-  (check-true (rem-type? type-2x3:s))
-  (check-true (rem-type? 'scalar))
-  (check-false (rem-type? (shape-idx #(2)))))
-
-;; Convert a Remora procedure's expected cell type to an expected cell rank
-(provide
- (contract-out (type->rank (-> rem-type? exact-nonnegative-integer?))))
-(define (type->rank type)
-  (cond [(equal? 'scalar type) 0]
-        [(rem-type-append? type)
-         (+ (vector-length (shape-idx-dims (rem-type-append-head type)))
-            (type->rank (rem-type-append-tail type)))]))
-(module+ test
-  (check-equal? (type->rank type-2:s) 1)
-  (check-equal? (type->rank type-2x3:s) 2)
-  (check-equal? (type->rank type-2:3:s) 2))
-
-;; TODO: may eventually want to just use unwrapped naturals/vectors
-;; A Remora index is one of
-;; - a Nat index, which wraps a natural number
-(provide (contract-out (struct nat-idx ([num exact-nonnegative-integer?]))))
-(define-struct nat-idx (num)
-  #:transparent)
-;; - a Shape index, which wraps a vector of Nat indices
-(provide (contract-out
-          (struct shape-idx ([dims (vectorof exact-nonnegative-integer?)]))))
-(define-struct shape-idx (dims)
-  #:transparent)
-;; Easier way to build a shape
-(provide (contract-out (shape (->* () #:rest (listof exact-nonnegative-integer?)
-                                   shape-idx?))))
-(define (shape . dims)
-  (shape-idx (apply vector-immutable dims)))
-
-;; Add Remora indices
-;; Consumes nat-idx arguments, produces a nat-idx
-(provide (contract-out (idx+ (->* () #:rest (listof nat-idx?)
-                                  nat-idx?))))
-(define (idx+ . xs)
-  (nat-idx (apply + (map nat-idx-num xs))))
-(module+ test
-  (check-equal? (idx+ (nat-idx 3) (nat-idx 5))
-                (nat-idx 8))
-  (check-equal? (idx+ (nat-idx 1) (nat-idx 2) (nat-idx 3))
-                (nat-idx 6)))
 
 ;; A Remora box (dependent sum) has
 ;; - contents, a Remora value
 ;; - indices, a list of the witness indices
 (provide (contract-out
-          (struct rem-box ([contents rem-array?]
-                           [indices (listof (or/c nat-idx? shape-idx?))]))))
-(define-struct rem-box (contents indices)
+          (struct rem-box ([contents rem-array?]))))
+(define-struct rem-box (contents)
   #:transparent)
-
-;; A Remora index abstraction is a Racket procedure which consumes Remora
-;; indices and produces a Remora value
-
-;; Remora index application is translated to Racket term application
 
 
 ;; Identify which of two sequences is the prefix of the other, or return #f
@@ -369,7 +302,7 @@
                (vector-immutable
                 (apply p (for/list [(a args)]
                            (vector-ref (rem-array-data a) 0))))))
-            (for/list [(i arity)] 'scalar)))
+            (for/list [(i arity)] 0)))
 
 ;; Build a scalar Remora array from a Racket value
 (define (scalar v) (rem-array #() (vector-immutable v)))
