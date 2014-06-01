@@ -1,5 +1,7 @@
 #lang racket/base
 
+; TODO: change how write/print/display work for rem-array
+
 (require racket/list
          racket/vector
          racket/sequence
@@ -206,6 +208,17 @@
   (check-equal? 1 (rem-array-rank array-ex:vector1))
   (check-equal? 2 (rem-array-rank array-ex:matrix1)))
 
+;; Convert a Remora vector (rank 1 Remora array) to a Racket vector
+(provide
+ (contract-out (rem-array->vector
+                (-> (λ (arr) (and (rem-array? arr)
+                                  (equal? (rem-array-rank arr) 1)))
+                    vector?))))
+(define (rem-array->vector arr)
+  (if (equal? (rem-array-rank arr) 1)
+      (rem-array-data arr)
+      (error rem-array->vector "provided array does not have rank 1")))
+
 
 ;; Apply a Remora procedure (for internal convenience)
 ;; TODO: consider eliminating this (see note in rem-proc struct defn)
@@ -233,6 +246,31 @@
   (define R* (rem-scalar-proc * 2))
   (check-equal? (R+ array-ex:scalar1 array-ex:scalar2)
                 (rem-array #() #(6))))
+
+
+;; Construct an array as a vector of -1-cells
+(provide
+ (contract-out (build-vec (->* (rem-array?) #:rest rem-array? rem-array?))))
+(define (build-vec arr . arrs)
+  (define (only-unique-element xs)
+    #;
+    (when (equal? 0 (sequence-length xs))
+           (error "looking for unique element in empty sequence"))
+    (for/fold ([elt (sequence-ref xs 0)])
+      ([x xs])
+      (if (equal? x elt)
+          x
+          (error "cannot use vec on arrays of mismatched shape"))))
+  (define cell-shape
+    (only-unique-element
+     (for/list ([a (cons arr arrs)])
+       (cond [(rem-array? a) (rem-array-shape a)]
+             [(rem-box? a) 'box]))))
+  (define num-cells (length (cons arr arrs)))
+  (rem-array
+   (for/vector ([dim (cons num-cells (vector->list cell-shape))]) dim)
+   (apply vector-append (for/list ([a (cons arr arrs)]) (rem-array-data a)))))
+
 
 
 ;; A Remora box (dependent sum) has
@@ -316,9 +354,4 @@
 
 ;; Build a scalar Remora array from a Racket value
 (define (scalar v) (rem-array #() (vector-immutable v)))
-
-;;;-------------------------------------
-;;; Translation
-;;;-------------------------------------
-;; Transform an Erased Remora AST into Racket code
 
