@@ -14,6 +14,15 @@
 ;;;-------------------------------------
 
 ;; Apply a Remora array (in Remora, an array may appear in function position)
+(provide
+ (contract-out
+  (apply-rem-array (->* (rem-array?
+                         #:result-shape
+                         (or/c symbol?
+                               (vectorof exact-nonnegative-integer?)))
+                        #:rest
+                        rem-array?
+                        rem-array?))))
 (define (apply-rem-array fun
                          #:result-shape [result-shape 'no-annotation]
                          . args)
@@ -104,14 +113,15 @@
          (when (debug-mode)
            (printf "  arg cell #~v, csize ~v, pfr ~v, fr ~v"
                    cell-id csize (sequence-fold * 1 principal-frame) fsize)
-           (printf " -- ~v\n"
-                   (rem-array
-                    (vector-take-right (rem-array-shape arr) r)
-                    (subvector (rem-array-data arr)
-                               (quotient (* cell-id csize)
-                                         (quotient (sequence-fold * 1 principal-frame)
-                                                   fsize))
-                               csize))))
+           (printf
+            " -- ~v\n"
+            (rem-array
+             (vector-take-right (rem-array-shape arr) r)
+             (subvector (rem-array-data arr)
+                        (quotient (* cell-id csize)
+                                  (quotient (sequence-fold * 1 principal-frame)
+                                            fsize))
+                        csize))))
          (rem-array
           (vector-take-right (rem-array-shape arr) r)
           (subvector (rem-array-data arr)
