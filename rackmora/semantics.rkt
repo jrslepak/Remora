@@ -18,12 +18,12 @@
 ;; Apply a Remora array (in Remora, an array may appear in function position)
 (provide
  (contract-out
-  (apply-rem-array (->* (rem-array?
-                         #:result-shape
+  (apply-rem-array (->* (rem-array?)
+                        (#:result-shape
                          (or/c symbol?
                                (vectorof exact-nonnegative-integer?)))
                         #:rest
-                        rem-array?
+                        (listof rem-array?)
                         rem-array?))))
 (define (apply-rem-array fun
                          #:result-shape [result-shape 'no-annotation]
@@ -189,7 +189,7 @@
   (rem-array-data  (-> rem-array?
                        (vectorof any/c)))
   (rem-array? (-> any/c boolean?))))
-(define-struct rem-array (shape data)
+(struct rem-array (shape data)
   #:transparent
   #:property prop:procedure apply-rem-array)
 (module+ test

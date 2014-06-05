@@ -4,7 +4,8 @@
          syntax/parse
          (for-syntax "semantics.rkt"
                      syntax/parse
-                     racket/base
+                     (except-in racket/base apply box unbox)
+                     (rename-in racket/base [apply racket-apply])
                      racket/list))
 
 (provide Rλ)
@@ -13,6 +14,7 @@
 
 
 (begin-for-syntax
+  (struct remora-macro (transformer))
   (define-syntax-class CONST
     #:description "Remora constant"
     #:literals (quote)
@@ -26,17 +28,17 @@
     (pattern cell-rank:nat))
   (define-syntax-class ATOM
     #:description "Remora atom"
-    #:datum-literals (fn)
+    #:literals (fn)
     (pattern const:CONST)
     (pattern (fn ((var:id r:RANK) ...) body:EXP)))
   (define-syntax-class ALITERAL
     #:description "Remora array literal"
-    #:datum-literals (array alit)
+    #:literals (array alit)
     (pattern (array piece:ALITERAL ...))
     (pattern (alit (dim:nat ...) elt:ATOM ...)))
   (define-syntax-class EXP
     #:description "Remora expression"
-    #:datum-literals (apply apply/shape box unbox vec :)
+    #:literals (apply apply/shape box unbox vec :)
     (pattern arr:ALITERAL)
     (pattern var:id)
     (pattern (apply fun:EXP arg:EXP ...))
@@ -86,27 +88,74 @@
     [(_ exp:EXP) #'#t]
     [(_ otherwise) #'#f]))
 
+(define-syntax (define-remora-syntax stx)
+  (syntax-parse stx
+    [(_ (macro-name:id macro-arg:id) macro-defn:expr)
+     #`(define-syntax macro-name
+         (remora-macro
+          (λ (macro-arg)
+            macro-defn)))]))
+
+; transform a Remora expression into Racket code
+; (this is not for converting Remora terms that are not expressions)
+; must recur on the subterms that should be Remora expressions
+(define-syntax (remora stx)
+  (syntax-parse stx
+    #:literals (fn alit array apply apply/shape box unbox vec)
+    ;; some builtin Remora forms need their subterms handled specially
+    ;; a bare ATOM in EXP position is converted to a scalar containing that ATOM
+    [(_ bare-atom:ATOM) #`(#,rem-array (#,vector) (#,vector bare-atom))]
+    ;; an array literal is built from nats and ATOMs, not EXPs, so don't recur
+    [(_ (alit subterms ...))
+     ((remora-macro-transformer (syntax-local-value #'alit))
+      #'(alit subterms ...))]
+    ;; the "smart constructor" has only ALITERALs as subterms, so don't recur
+    [(_ (array subterms ...))
+     ((remora-macro-transformer (syntax-local-value #'array))
+      #'(array subterms ...))]
+    ;; check whether head is another Remora form (possibly a remora-macro)
+    [(_ (head tail ...))
+     #:declare head (static remora-macro? "remora macro")
+     ((remora-macro-transformer (syntax-local-value #'head))
+      #'((remora head) (remora tail) ...))]
+    ;; if not, this is function application
+    [(_ (head tail ...))
+     ((remora-macro-transformer (syntax-local-value #'apply))
+      #'(apply (remora head) (remora tail) ...))
+     #;(datum->syntax stx (format "~v is not a remora macro" #`head))]
+    ;; identifiers pass through unchanged
+    [(_ var:id) #'var]))
+
+(define-remora-syntax (fn stx)
+  (syntax-parse stx
+    [(_ ((var:id rank:expr) ...) body ...+)
+    #'(rem-proc (λ (var ...) body ...)
+                 (list rank ...))]))
+
 ; (alit (nat ...) atom ...)
 ;  (rem-array (vector nat ...) (vector atom ...))
 ; TODO: automated test
-(define-syntax (alit stx)
+(define-remora-syntax (alit stx)
   (syntax-parse stx
-    #;[(_ (dim:nat ...) elt:CONST ...) #`(#,rem-array (#,vector dim ...)
-                                                    (#,vector elt ...))]
-    [(_ (dim:nat ...) elt:ATOM ...) #`(#,rem-array (#,vector dim ...)
-                                                   (#,vector elt ...))]))
+    [(_ (dim:nat ...) elt:ATOM ...) #`(rem-array (vector dim ...)
+                                                 (vector elt ...))]))
 
 ; (apply expr1 expr2 ...)
 ;  (apply-rem-array expr expr ...)
 ; TODO: automated test
-(define-syntax (apply stx)
+(define-remora-syntax (apply stx)
   (syntax-parse stx
-    [(_ fun:EXP arg:EXP ...) #`(fun arg ...)]))
+    [(_ fun:EXP arg:EXP ...) #`(apply-rem-array fun arg ...)]))
 
 ; (apply/shape expr0 expr1 expr2 ...)
 ;  (apply-rem-array (rem-array->vector expr0) expr expr ...)
 ; TODO: automated test
-(define-syntax (apply/shape stx)
+(define-remora-syntax (apply/shape stx)
+  (syntax-parse stx
+    [(_ shp:EXP fun:EXP arg:EXP ...)
+     #`(apply-rem-array (#,rem-array->vector shp)
+                        fun arg ...)]))
+(define-remora-syntax (: stx)
   (syntax-parse stx
     [(_ shp:EXP fun:EXP arg:EXP ...)
      #`(apply-rem-array (#,rem-array->vector shp)
@@ -118,14 +167,14 @@
 ; (box expr)
 ;  (rem-box expr)
 ; TODO: automated test
-(define-syntax (box stx)
+(define-remora-syntax (box stx)
   (syntax-parse stx
     [(_ contents:EXP) #`(#,rem-box contents)]))
 
 ; (unbox var some-box expr)
 ;  (let ([var (rem-box-contents some-box)]) expr)
 ; TODO: automated test
-(define-syntax (unbox stx)
+(define-remora-syntax (unbox stx)
   (syntax-parse stx
     [(_ var:id some-box:EXP body:EXP)
      #`(let ([var (#,rem-box-contents some-box)]) body)]))
@@ -133,7 +182,7 @@
 ; (vec expr ...)
 ;  (build-vec expr ...)
 ; TODO: automated test
-(define-syntax (vec stx)
+(define-remora-syntax (vec stx)
   (syntax-parse stx
     [(_ piece:EXP ...) #`(#,build-vec piece ...)]))
 
@@ -143,9 +192,9 @@
 ; disallow (alit ...)s with mismatching forms
 ; otherwise, (apply build-array exps)
 ; TODO: automated test
-(define-syntax (array stx)
+(define-remora-syntax (array stx)
   (syntax-parse stx
-    #:datum-literals (alit)
+    #:literals (alit)
     [(_ (alit (dim:nat ...) elt:ATOM ...) ...+)
      #:when (all-equal? (syntax->datum (syntax ((dim ...) ...))))
      #:with (old-dims ...) (first (syntax-e #`((dim ...) ...)))
@@ -154,7 +203,8 @@
                        (length (syntax->datum #`((elt ...) ...))))
      #:with (joined-elts ...) (datum->syntax
                                stx
-                               (apply append (syntax->datum #`((elt ...) ...))))
+                               (racket-apply append
+                                             (syntax->datum #`((elt ...) ...))))
      #'(alit (outer-dim old-dims ...) joined-elts ...)]
     [(_ (alit (dim:nat ...) elt:ATOM ...) ...+)
      #:when (not (all-equal? (syntax->datum (syntax ((dim ...) ...)))))
