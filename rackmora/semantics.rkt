@@ -32,7 +32,7 @@
   (unless (for/and [(p (rem-array-data fun))] (rem-proc? p))
     (error "Array in function position must contain only Remora functions" fun))
   
-  (when (debug-mode) (printf "Result shape is ~v\n" result-shape))
+  (when (debug-mode) (printf "\n\nResult shape is ~v\n" result-shape))
   
   ; check whether args actually are Remora arrays
   (unless (for/and [(arr args)] (rem-array? arr))
@@ -45,7 +45,7 @@
       (when (debug-mode) (printf "checking expected ranks for ~v\n" p))
       (for/vector [(t (rem-proc-ranks p))
                    (arr args)]
-        (when (debug-mode) (printf " - ~v\n" t))
+        (when (debug-mode) (printf "~v - ~v\n" p t))
         (if (equal? 'all t)
             (rem-array-rank arr)
             t))))
@@ -120,16 +120,19 @@
             (rem-array
              (vector-take-right (rem-array-shape arr) r)
              (subvector (rem-array-data arr)
-                        (quotient (* cell-id csize)
-                                  (quotient (sequence-fold * 1 principal-frame)
-                                            fsize))
+                        (* csize
+                           (quotient
+                            cell-id
+                            (quotient (sequence-fold * 1 principal-frame)
+                                      fsize)))
                         csize))))
          (rem-array
           (vector-take-right (rem-array-shape arr) r)
           (subvector (rem-array-data arr)
-                     (quotient (* cell-id csize)
-                               (quotient (sequence-fold * 1 principal-frame)
-                                         fsize))
+                     (* csize
+                        (quotient cell-id
+                                  (quotient (sequence-fold * 1 principal-frame)
+                                            fsize)))
                      csize))))))
   (when (debug-mode) (printf "result-cells = ~v\n" result-cells))
   
@@ -161,7 +164,7 @@
     (apply vector-append
            (for/list ([r result-cells])
              (rem-array-data r))))
-  (when (debug-mode) (printf "final-data = ~v\n" final-data))
+  (when (debug-mode) (printf "final-data = ~v\n\n\n" final-data))
   
   (rem-array final-shape final-data))
 
