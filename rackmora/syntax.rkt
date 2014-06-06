@@ -17,6 +17,7 @@
          apply/shape
          box
          unbox
+         vec
          rerank)
 
 
@@ -182,7 +183,7 @@
 ; TODO: automated test
 (define-remora-syntax (vec stx)
   (syntax-parse stx
-    [(_ piece ...) #`(#,build-vec (remora piece) ...)]))
+    [(_ piece ...) #'(build-vec (remora piece) ...)]))
 
 ; (array . array-literals)
 ; "smart constructor"

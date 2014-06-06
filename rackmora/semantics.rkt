@@ -253,7 +253,9 @@
 
 ;; Construct an array as a vector of -1-cells
 (provide
- (contract-out (build-vec (->* (rem-array?) #:rest rem-array? rem-array?))))
+ (contract-out (build-vec (->* (rem-array?)
+                               #:rest (listof rem-array?)
+                               rem-array?))))
 (define (build-vec arr . arrs)
   (define (only-unique-element xs)
     #;
