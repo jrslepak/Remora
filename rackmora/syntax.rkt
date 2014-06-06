@@ -16,7 +16,8 @@
          array
          apply/shape
          box
-         unbox)
+         unbox
+         rerank)
 
 
 
@@ -217,3 +218,15 @@
           [else (and (equal? (first xs) (second xs))
                      (all-equal? (rest xs)))])))
 
+
+; sugar for reranking by eta-expansion
+; operates on function arrays (as names only stand for arrays, not functions),
+; but constructs a scalar
+(define-remora-syntax (rerank stx)
+  (syntax-parse stx
+    [(_ (new-rank:RANK ...) original-function)
+     #:with (param ...) (for/list ([i (length (syntax-e #'(new-rank ...)))])
+                          (generate-temporary))
+     #'(remora
+        (alit () (fn ((param new-rank) ...)
+                     (original-function param ...))))]))
