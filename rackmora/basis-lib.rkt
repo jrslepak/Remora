@@ -78,15 +78,16 @@
                           (vector-take (rem-array-data arr)
                                        (for/product ([d cell-shape]) d)))))))
 (module+ test
-  ; TODO: make a "rerank" macro and rewrite test cases using it
   (check-equal?
-   ((rem-array #() (vector (Rλ ([arr 1]) (R_head arr))))
-     (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
-   (rem-array #(4) #(0 3 6 9)))
+   (remora
+    ((rerank (1) R_head)
+     (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
+   (remora (alit (4) 0 3 6 9)))
   (check-equal?
-   (R_head
-     (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
-   (rem-array #(3) #(0 1 2))))
+   (remora
+    (R_head
+     (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
+   (remora (alit (3) 0 1 2))))
 
 (define R_tail
   (rem-array
@@ -100,13 +101,15 @@
                                       (for/product ([d cell-shape]) d)))))))
 (module+ test
   (check-equal?
-   ((rem-array #() (vector (Rλ ([arr 1]) (R_tail arr))))
-    (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
-   (rem-array #(4) #(2 5 8 11)))
+   (remora
+    ((rerank (1) R_tail)
+     (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
+   (remora (alit (4) 2 5 8 11)))
   (check-equal?
-   (R_tail
-    (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
-   (rem-array #(3) #(9 10 11))))
+   (remora
+    (R_tail
+     (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
+   (remora (alit (3) 9 10 11))))
 
 (define R_behead
   (rem-array
@@ -127,13 +130,15 @@
                                 (for/product ([d cell-shape]) d)))))))
 (module+ test
   (check-equal?
-   ((rem-array #() (vector (Rλ [(arr 1)] (R_behead arr))))
-    (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
-   (rem-array #(4 2) #(1 2 4 5 7 8 10 11)))
+   (remora
+    ((rerank (1) R_behead)
+     (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
+   (remora (alit (4 2) 1 2 4 5 7 8 10 11)))
   (check-equal?
-   (R_behead
-    (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
-   (rem-array #(3 3) #(3 4 5 6 7 8 9 10 11))))
+   (remora
+    (R_behead
+     (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
+   (remora (alit (3 3) 3 4 5 6 7 8 9 10 11))))
 
 (define R_curtail
   (rem-array
@@ -148,13 +153,15 @@
                                       (for/product ([d cell-shape]) d)))))))
 (module+ test
   (check-equal?
-   ((rem-array #() (vector (Rλ [(arr 1)] (R_curtail arr))))
-    (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
-   (rem-array #(4 2) #(0 1 3 4 6 7 9 10)))
+   (remora
+    ((rerank (1) R_curtail)
+     (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
+   (remora (alit (4 2) 0 1 3 4 6 7 9 10)))
   (check-equal?
-   (R_curtail
-    (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11)))
-   (rem-array #(3 3) #(0 1 2 3 4 5 6 7 8))))
+   (remora
+    (R_curtail
+     (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
+   (remora (alit (3 3) 0 1 2 3 4 5 6 7 8))))
 
 ; Split an array into a list of cells of a given rank
 (define (array->cell-list arr cell-rank)
@@ -205,13 +212,13 @@
                           (vector-drop (rem-array-shape arr) 1))))))
 (module+ test
   (check-equal?
-   ((rem-array #() (vector (Rλ ([arr 1]) (R_reverse arr))))
-    (rem-array #(3 4) #(0 1 2 3 4 5 6 7 8 9 10 11)))
-   (rem-array #(3 4) #(3 2 1 0 7 6 5 4 11 10 9 8)))
+   (remora ((rerank (1) R_reverse)
+            (alit (3 4) 0 1 2 3 4 5 6 7 8 9 10 11)))
+   (remora (alit (3 4) 3 2 1 0 7 6 5 4 11 10 9 8)))
   (check-equal?
-   (R_reverse
-    (rem-array #(3 4) #(0 1 2 3 4 5 6 7 8 9 10 11)))
-   (rem-array #(3 4) #(8 9 10 11 4 5 6 7 0 1 2 3))))
+   (remora (R_reverse
+            (alit (3 4) 0 1 2 3 4 5 6 7 8 9 10 11)))
+   (remora (alit (3 4) 8 9 10 11 4 5 6 7 0 1 2 3))))
 
 (define R_append
   (rem-array
@@ -232,12 +239,13 @@
 
 (module+ test
   (check-equal?
-   (R_append
-    (rem-array #(4 3) #(0 1 2 3 4 5 6 7 8 9 10 11))
-    (rem-array #(2 3) #(20 30 40 50 60 70)))
-   (rem-array #(6 3) #(0 1 2 3 4 5 6 7 8 9 10 11 20 30 40 50 60 70)))
+   (remora (R_append
+            (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)
+            (alit (2 3) 20 30 40 50 60 70)))
+   (remora (alit (6 3) 0 1 2 3 4 5 6 7 8 9 10 11 20 30 40 50 60 70)))
   (check-equal?
-   ((rem-array #() (vector (Rλ ([arr1 1] [arr2 1]) (R_append arr1 arr2))))
-    (rem-array #(3 4) #(0 1 2 3 4 5 6 7 8 9 10 11))
-    (rem-array #(3 2) #(20 30 40 50 60 70)))
-   (rem-array #(3 6) #(0 1 2 3 20 30 4 5 6 7 40 50 8 9 10 11 60 70))))
+   (remora
+    ((rerank (1 1) R_append)
+     (alit (3 4) 0 1 2 3 4 5 6 7 8 9 10 11)
+     (alit (3 2) 20 30 40 50 60 70)))
+   (remora (alit (3 6) 0 1 2 3 20 30 4 5 6 7 40 50 8 9 10 11 60 70))))
