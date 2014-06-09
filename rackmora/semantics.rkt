@@ -173,6 +173,30 @@
   (and ((vectorof elts #:flat? #t) vec)
        (equal? (vector-length vec) len)))
 
+;; String representation of an array, for print, write, or display mode
+(define (array->string arr [mode 0])
+  (define format-string
+    (cond [(member mode '(0 1)) "~v"] ; print
+          [(equal? mode #t) "~s"]     ; write
+          [(equal? mode #f) "~a"]))   ; display
+  (if (equal? mode #t)
+      ; write mode
+      (format "(rem-array ~s ~s)" (rem-array-shape arr) (rem-array-data arr))
+      ; print/display mode
+      (cond [(= 0 (rem-array-rank arr))
+             (format format-string (vector-ref (rem-array-data arr) 0))]
+            [else (string-append
+                   (for/fold ([str "["])
+                     ([cell (-1-cells arr)]
+                      [cell-id (length (-1-cells arr))])
+                     (string-append str
+                                    (if (equal? 0 cell-id) "" " ")
+                                    (array->string cell mode)))
+                   "]")])))
+;; Print, write, or display an array
+(define (show-array arr [port (current-output-port)] [mode 0])
+  (display (array->string arr mode) port))
+
 ;; A Remora array has
 ;; - shape, a vector of numbers
 ;; - data, a vector of any
@@ -194,7 +218,8 @@
   (rem-array? (-> any/c boolean?))))
 (struct rem-array (shape data)
   #:transparent
-  #:property prop:procedure apply-rem-array)
+  #:property prop:procedure apply-rem-array
+  #:methods gen:custom-write [(define write-proc show-array)])
 (module+ test
   (define array-ex:scalar1 (rem-array #() #(4)))
   (define array-ex:scalar2 (rem-array #() #(2)))
@@ -232,6 +257,10 @@
 (define (rank? r)
   (or (exact-nonnegative-integer? r) (equal? 'all r)))
 
+;; Print, write, or display a Remora procedure
+(define (show-rem-proc proc [port (current-output-port)] [mode 0])
+  (display "#<rem-proc>" port))
+
 ;; A Remora procedure has
 ;; - body, a Racket procedure which consumes and produces Remora arrays
 ;; - ranks, a list of the procedure's expected argument ranks
@@ -242,7 +271,8 @@
   #:transparent
   ; may decide to drop this part -- it seems to hide a common error:
   ;   using (R+ arr1 arr2) instead of ([scalar R+] arr1 arr2) means no lifting
-  #:property prop:procedure apply-rem-proc)
+  #:property prop:procedure apply-rem-proc
+  #:methods gen:custom-write [(define write-proc show-rem-proc)])
 (module+ test
   (define R+ (rem-scalar-proc + 2))
   (define R- (rem-scalar-proc - 2))
@@ -325,6 +355,18 @@
                       (antibase-internal (rest radix)
                                          (remainder num (foldr * 1 radix))))]))
   (rest (antibase-internal radix num)))
+
+
+;; Convert a rank-1 or higher array to a list of its -1-cells
+(define (-1-cells arr)
+  (define cell-shape (vector-drop (rem-array-shape arr) 1))
+  (define cell-size (for/product ([dim cell-shape]) dim))
+  (define num-cells (vector-ref (rem-array-shape arr) 0))
+  (for/list ([cell-id num-cells])
+    (rem-array cell-shape
+               (subvector (rem-array-data arr)
+                          (* cell-id cell-size)
+                          cell-size))))
 
 
 
