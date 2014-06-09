@@ -123,7 +123,7 @@
 (define-remora-syntax (fn stx)
   (syntax-parse stx
     [(_ ((var:id rank:expr) ...) body ...+)
-    #'(rem-proc (λ (var ...) body ...)
+    #'(rem-proc (λ (var ...) (remora body) ...)
                  (list rank ...))]))
 
 ; (alit (nat ...) atom ...)
