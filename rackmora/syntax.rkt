@@ -95,7 +95,7 @@
     ;; a bare ATOM in EXP position is converted to a scalar containing that ATOM
     [(_ bare-atom:ATOM)
      (begin
-       (displayln "converting bare atom to scalar")
+       #;(displayln "converting bare atom to scalar")
        #'(rem-array (vector) (vector (remora-atom bare-atom))))]
     ;; check whether head is another Remora form (possibly a remora-macro)
     [(_ (head tail ...))
@@ -211,8 +211,8 @@
             (syntax-source stx)
             (syntax-line stx)
             (syntax-column stx))]
-    [(_ piece:ALITERAL ...)
-     #'(vec piece ...)]))
+    [(_ piece ...)
+     #'(remora (vec piece ...))]))
 (begin-for-syntax
   (define (all-equal? xs)
     (cond [(<= (length xs) 1) #t]
