@@ -402,3 +402,33 @@
 ;; Build a scalar Remora array from a Racket value
 (define (scalar v) (rem-array #() (vector-immutable v)))
 
+;; Apply what may be a Remora array or a Racket procedure to some Remora arrays,
+;; with a possible result shape annotation
+(provide (contract-out
+          (remora-apply (->* (procedure?)
+                             (#:result-shape
+                              (or/c symbol?
+                                    (vectorof exact-nonnegative-integer?)))
+                             #:rest
+                             (listof rem-array?)
+                             rem-array?))))
+(define (remora-apply
+         fun
+         #:result-shape [result-shape 'no-annotation]
+         . args)
+  (cond [(rem-array? fun)
+         (apply apply-rem-array
+                fun
+                #:result-shape result-shape
+                args)]
+        [(rem-proc? fun)
+         (apply apply-rem-array
+                (rem-array #() (vector fun))
+                #:result-shape result-shape
+                args)]
+        [(procedure? fun)
+         (apply apply-rem-array
+                (rem-array #()
+                           (vector (rem-scalar-proc fun (length args))))
+                #:result-shape result-shape
+                args)]))

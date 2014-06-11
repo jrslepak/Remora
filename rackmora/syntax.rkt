@@ -141,8 +141,8 @@
 (define-remora-syntax (apply stx)
   (syntax-parse stx
     [(_ fun arg ...)
-     #'(apply-rem-array (remora fun)
-                        (remora arg) ...)]))
+     #'(remora-apply (remora fun)
+                     (remora arg) ...)]))
 
 ; (apply/shape expr0 expr1 expr2 ...)
 ;  (apply-rem-array (rem-array->vector expr0) expr expr ...)
@@ -150,9 +150,9 @@
 (define-remora-syntax (apply/shape stx)
   (syntax-parse stx
     [(_ shp fun arg ...)
-     #`(apply-rem-array (#,rem-array->vector shp)
-                        (remora fun)
-                        (remora arg) ...)]))
+     #`(remora-apply (#,rem-array->vector shp)
+                     (remora fun)
+                     (remora arg) ...)]))
 (define-remora-syntax (: stx)
   (syntax-parse stx
     [(_ shp fun arg ...)
