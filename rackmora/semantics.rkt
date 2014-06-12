@@ -418,7 +418,7 @@
          . args)
   (cond [(rem-array? fun)
          (apply apply-rem-array
-                fun
+                (racket-proc-array->rem-proc-array fun (length args))
                 #:result-shape result-shape
                 args)]
         [(rem-proc? fun)
@@ -432,3 +432,16 @@
                            (vector (rem-scalar-proc fun (length args))))
                 #:result-shape result-shape
                 args)]))
+
+;; if given array contains Racket procedures, convert them to Remora procedures
+;; of the given arity
+(define (racket-proc-array->rem-proc-array arr arity)
+  (rem-array (rem-array-shape arr)
+             (for/vector ([elt (rem-array-data arr)])
+               (cond [(rem-proc? elt) elt]
+                     [(procedure? elt) (rem-scalar-proc elt arity)]))))
+
+(provide (contract-out (racket->remora (-> any/c rem-array?))))
+(define (racket->remora val)
+  (cond [(rem-array? val) val]
+        [else (rem-array #() (vector val))]))

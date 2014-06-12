@@ -106,8 +106,9 @@
     [(_ (head tail ...))
      ((remora-macro-transformer (syntax-local-value #'apply))
       #'(apply head tail ...))]
-    ;; identifiers pass through unchanged
-    [(_ var:id) #'var]))
+    ;; identifiers get a dynamic check/coercion to convert Racket values
+    ;; into Remora scalars
+    [(_ var:id) #`(racket->remora var)]))
 ; transform a Remora atom into Racket code
 (define-syntax (remora-atom stx)
   (syntax-parse stx
