@@ -2,6 +2,10 @@
 (require "semantics.rkt"
          "syntax.rkt")
 
+(provide remora-readtable
+         remora-read
+         remora-read-syntax)
+
 ; #A(NAT ...)(ATOM ...)
 ;  reads as
 ; (alit (NAT ...) ATOM ...)
@@ -15,10 +19,7 @@
   (define shape (read port))
   (define atoms (read port))
   (cons 'alit
-        (cons shape atoms))
-  #;(list 'rem-array
-        (cons 'vector shape)
-        (cons 'vector atoms)))
+        (cons shape atoms)))
 
 ; [ALITERAL ...]
 ;  reads as
@@ -73,3 +74,10 @@
    (list #\A 'dispatch-macro read-alit)
    (list #\[ 'terminating-macro read-array)
    (list #\r 'dispatch-macro read-rerank)))
+
+(define (remora-read . args)
+  (parameterize ([current-readtable remora-readtable])
+    (apply read args)))
+(define (remora-read-syntax . args)
+  (parameterize ([current-readtable remora-readtable])
+    (apply read-syntax args)))

@@ -9,6 +9,10 @@
 (module+ test
   (require rackunit))
 
+(provide (except-out (all-defined-out)
+                     array->cell-list
+                     cell-list->array))
+
 
 (define R_id (rem-array #() (vector (rem-scalar-proc (λ (x) x) 1))))
 
