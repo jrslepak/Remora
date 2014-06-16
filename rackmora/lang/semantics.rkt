@@ -347,16 +347,6 @@
   (check-equal? (subvector #(2 4 6 3 5 7) 4 0) #()))
 
 
-;; Express a number in a given radix sequence
-(define (antibase radix num)
-  (define (antibase-internal radix num)
-    (cond [(empty? radix) (list num)]
-          [else (cons (quotient num (foldr * 1 radix))
-                      (antibase-internal (rest radix)
-                                         (remainder num (foldr * 1 radix))))]))
-  (rest (antibase-internal radix num)))
-
-
 ;; Convert a rank-1 or higher array to a list of its -1-cells
 (define (-1-cells arr)
   (define cell-shape (vector-drop (rem-array-shape arr) 1))

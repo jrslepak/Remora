@@ -5,7 +5,8 @@
          racket/math
          racket/vector
          racket/list
-         racket/contract)
+         racket/contract
+         racket/sequence)
 (module+ test
   (require rackunit))
 
@@ -253,3 +254,79 @@
      (alit (3 4) 0 1 2 3 4 5 6 7 8 9 10 11)
      (alit (3 2) 20 30 40 50 60 70)))
    (remora (alit (3 6) 0 1 2 3 20 30 4 5 6 7 40 50 8 9 10 11 60 70))))
+
+
+;; Express a number in a given radix sequence
+(define (antibase radix num)
+  (define (antibase-internal radix num)
+    (cond [(empty? radix) (list num)]
+          [else (cons (quotient num (for/product ([d radix]) d))
+                      (antibase-internal
+                       (sequence-tail radix 1)
+                       (remainder num
+                                  (for/product ([d radix]) d))))]))
+  (rest (antibase-internal radix num)))
+
+(define R_antibase
+  (rem-array
+   #()
+   (vector
+    (Rλ ([radix 1]
+         [num 0])
+        (define digits (antibase (vector->list (rem-array-data radix))
+                                 (vector-ref (rem-array-data num) 0)))
+        (rem-array (vector (length digits))
+                   (list->vector digits))))))
+(module+ test
+  (check-equal? (remora (R_antibase (alit (3) 3 2 4) (alit () 15)))
+                (remora (alit (3) 1 1 3)))
+  (check-equal? (remora (R_antibase (alit (3) 3 2 4) (alit (2) 15 25)))
+                (remora (alit (2 3) 1 1 3 0 0 1)))
+  (check-equal? (remora (R_antibase (alit (2 3) 2 5 1 3 2 4) (alit () 15)))
+                (remora (alit (2 3) 1 0 0 1 1 3))))
+
+
+(define (scan op xs)
+  (reverse
+   (for/fold ([acc (list (sequence-ref xs 0))])
+     ([elt (sequence-tail xs 1)])
+     (cons (op elt (first acc)) acc))))
+; Interpret a digit list in a given radix
+(define (base radix digits)
+  ; if radix is too short, extend by copying its first element
+  (define padded-radix
+    (if (> (length digits) (length radix))
+        (append (for/list ([c (- (length digits)
+                                 (length radix))])
+                  (first radix))
+                radix)
+        radix))
+  ; if digits is too short, zero-extend it
+  (define padded-digits
+    (if (> (length radix) (length digits))
+        (append (for/list ([c (- (length radix)
+                                 (length digits))])
+                  0)
+                digits)
+        digits))
+  (for/sum ([place-value (reverse (scan * (cons 1 (reverse
+                                                   (rest padded-radix)))))]
+            [digit padded-digits])
+    (* place-value digit)))
+(define R_base
+  (rem-array
+   #()
+   (vector
+    (Rλ ([radix 1]
+         [digits 1])
+        (rem-array #() (vector
+                        (base (vector->list (rem-array->vector radix))
+                              (vector->list (rem-array->vector digits)))))))))
+(module+ test
+  (check-equal? (remora (R_base (alit (3) 3 2 4) (alit (3) 1 2 3)))
+                (remora (alit () 19)))
+  (check-equal? (remora (R_base (alit (1) 2) (alit (3) 1 0 1)))
+                (remora (alit () 5)))
+  (check-equal? (remora (R_base (alit (4) 7 24 60 60) (alit (3) 1 11 12)))
+                (remora (alit () 4272))))
+
