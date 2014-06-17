@@ -1,5 +1,7 @@
 #lang racket/base
 
+; TODO: add define form, modify fn to allow local define
+
 (require "semantics.rkt"
          syntax/parse
          (for-syntax "semantics.rkt"
@@ -91,24 +93,32 @@
 ; remora macros must explicitly recur on the subterms that should be Remora code
 (define-syntax (remora stx)
   (syntax-parse stx
-    #:literals (fn alit array apply apply/shape box unbox vec)
+    #:literals (fn alit array apply apply/shape box unbox vec require provide)
+    ;; require and provide apparently need to be recognized specially, as
+    ;; redefining them breaks lots of things
+    [(_ (require subterms ...)) #'(require subterms ...)]
+    [(_ (provide subterms ...)) #'(provide subterms ...)]
     ;; a bare ATOM in EXP position is converted to a scalar containing that ATOM
     [(_ bare-atom:ATOM)
      (begin
-       #;(displayln "converting bare atom to scalar")
+       ;(displayln "converting bare atom to scalar")
        #'(rem-array (vector) (vector (remora-atom bare-atom))))]
     ;; check whether head is another Remora form (possibly a remora-macro)
     [(_ (head tail ...))
      #:declare head (static remora-macro? "remora macro")
-     ((remora-macro-transformer (syntax-local-value #'head))
-      #'(head tail ...))]
+     (begin
+       ;(printf "expanding remora macro ~v\n" (syntax->datum #'head))
+       ((remora-macro-transformer (syntax-local-value #'head))
+        #'(head tail ...)))]
     ;; if not, this is function application
     [(_ (head tail ...))
      ((remora-macro-transformer (syntax-local-value #'apply))
       #'(apply head tail ...))]
     ;; identifiers get a dynamic check/coercion to convert Racket values
     ;; into Remora scalars
-    [(_ var:id) #`(racket->remora var)]))
+    [(_ var:id) #`(racket->remora var)]
+    ;; multiple subterms are treated as having an implicit begin
+    [(_ subterm ...) #'(begin (remora subterm) ...)]))
 ; transform a Remora atom into Racket code
 (define-syntax (remora-atom stx)
   (syntax-parse stx
@@ -169,7 +179,7 @@
 ; TODO: automated test
 (define-remora-syntax (box stx)
   (syntax-parse stx
-    [(_ contents) #`(#,rem-box (remora contents))]))
+    [(_ contents) #'(rem-box (remora contents))]))
 
 ; (unbox var some-box expr)
 ;  (let ([var (rem-box-contents some-box)]) expr)
@@ -219,6 +229,21 @@
     (cond [(<= (length xs) 1) #t]
           [else (and (equal? (first xs) (second xs))
                      (all-equal? (rest xs)))])))
+
+; (def name defn-or-expr ... expr)
+(define-remora-syntax (def stx)
+  (syntax-parse stx
+    [(_ name defn-or-expr ...)
+     #'(define name (remora defn-or-expr) ...)]))
+
+#;
+(define-remora-syntax (require stx)
+  (syntax-parse stx
+    [(_ subterm ...) #'(require subterm ...)]))
+#;
+(define-remora-syntax (provide stx)
+  (syntax-parse stx
+    [(_ subterm ...) #'(provide subterm ...)]))
 
 
 ; sugar for reranking by eta-expansion
