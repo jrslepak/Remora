@@ -1,6 +1,10 @@
-#lang racket
+#lang s-exp syntax/module-reader
+"lang/language.rkt"
+#:read remora-read
+#:read-syntax remora-read-syntax
 (require "semantics.rkt"
-         "syntax.rkt")
+         "syntax.rkt"
+         racket/list)
 
 (provide remora-readtable
          remora-read
@@ -58,11 +62,10 @@
   (define base-exp (read port))
   (list 'rerank new-ranks base-exp))
 
-
+;(require racket/list)
 (define (extend-readtable base-readtable . new-entries)
   (cond [(empty? new-entries) base-readtable]
         [else
-         (printf "new readtable entry ~v\n" (first new-entries))
          (apply extend-readtable
                (cons (apply make-readtable
                             (cons base-readtable (first new-entries)))
