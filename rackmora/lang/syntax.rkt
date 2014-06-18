@@ -19,7 +19,8 @@
          box
          unbox
          vec
-         rerank)
+         rerank
+         def)
 
 
 
