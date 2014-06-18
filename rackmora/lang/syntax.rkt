@@ -4,8 +4,7 @@
 
 (require "semantics.rkt"
          syntax/parse
-         (for-syntax "semantics.rkt"
-                     syntax/parse
+         (for-syntax syntax/parse
                      (except-in racket/base apply box unbox)
                      (rename-in racket/base [apply racket-apply])
                      racket/list
@@ -116,7 +115,7 @@
       #'(apply head tail ...))]
     ;; identifiers get a dynamic check/coercion to convert Racket values
     ;; into Remora scalars
-    [(_ var:id) #`(racket->remora var)]
+    [(_ var:id) #'(racket->remora var)]
     ;; multiple subterms are treated as having an implicit begin
     [(_ subterm ...) #'(begin (remora subterm) ...)]))
 ; transform a Remora atom into Racket code
@@ -161,13 +160,13 @@
 (define-remora-syntax (apply/shape stx)
   (syntax-parse stx
     [(_ shp fun arg ...)
-     #`(remora-apply (#,rem-array->vector shp)
+     #'(remora-apply (rem-array->vector shp)
                      (remora fun)
                      (remora arg) ...)]))
 (define-remora-syntax (: stx)
   (syntax-parse stx
     [(_ shp fun arg ...)
-     #`(remora-apply (#,rem-array->vector shp)
+     #'(remora-apply (rem-array->vector shp)
                      (remora fun)
                      (remora arg) ...)]))
 ; or should the shape only get evaluated if it turns out to be needed?
@@ -187,7 +186,7 @@
 (define-remora-syntax (unbox stx)
   (syntax-parse stx
     [(_ var:id some-box body)
-     #`(let ([var (#,rem-box-contents (remora some-box))]) (remora body))]))
+     #'(let ([var (rem-box-contents (remora some-box))]) (remora body))]))
 
 ; (vec expr ...)
 ;  (build-vec expr ...)
