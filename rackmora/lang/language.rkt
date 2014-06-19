@@ -3,13 +3,15 @@
 (require "syntax.rkt"
          "semantics.rkt"
          "reader.rkt"
+         "basis-lib.rkt"
          (for-syntax racket/base
                      syntax/parse)
          (rename-in (only-in racket/base #%module-begin)
                     [#%module-begin #%racket-module-begin]))
 
 (provide (all-from-out "syntax.rkt"
-                       "semantics.rkt")
+                       "semantics.rkt"
+                       "basis-lib.rkt")
          (rename-out [remora-module-begin #%module-begin]
                      [remora-top-interaction #%top-interaction])
          #%racket-module-begin
