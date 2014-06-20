@@ -152,21 +152,27 @@
       ;       (i.e. frame-shape ++ cell-shape) result shapes
       [(equal? 0 (vector-length result-cells)) result-shape]
       [(for/and ([c result-cells])
-         (equal? (rem-array-shape (vector-ref result-cells 0))
-                 (rem-array-shape c)))
+         (equal? (rem-value-shape (vector-ref result-cells 0))
+                 (rem-value-shape c)))
        (vector-append principal-frame
-                      (rem-array-shape (vector-ref result-cells 0)))]
+                      (rem-value-shape (vector-ref result-cells 0)))]
       [else (error "Result cells have mismatched shapes: ~v" result-cells)]))
   (when (debug-mode) (printf "final-shape = ~v\n" final-shape))
   
   ; determine final result data: all result cells' data vectors concatenated
   (define final-data
-    (apply vector-append
-           (for/list ([r result-cells])
-             (rem-array-data r))))
+    (if (and (> (vector-length result-cells) 0)
+             (rem-box? (vector-ref result-cells 0)))
+        (for/vector ([r result-cells]) r)
+        (apply vector-append
+               (for/list ([r result-cells])
+                 (rem-value-data r)))))
   (when (debug-mode) (printf "final-data = ~v\n\n\n" final-data))
   
-  (rem-array final-shape final-data))
+  (if (and (equal? #() final-shape)
+           (rem-box? (vector-ref final-data 0)))
+      (vector-ref final-data 0)
+      (rem-array final-shape final-data)))
 
 ;; Contract constructor for vectors of specified length
 (define ((vector-length/c elts len) vec)
@@ -283,8 +289,8 @@
 
 ;; Construct an array as a vector of -1-cells
 (provide
- (contract-out (build-vec (->* (rem-array?)
-                               #:rest (listof rem-array?)
+ (contract-out (build-vec (->* ((or/c rem-array? rem-box?))
+                               #:rest (listof (or/c rem-array? rem-box?))
                                rem-array?))))
 (define (build-vec arr . arrs)
   (define (only-unique-element xs)
@@ -302,9 +308,12 @@
        (cond [(rem-array? a) (rem-array-shape a)]
              [(rem-box? a) 'box]))))
   (define num-cells (length (cons arr arrs)))
-  (rem-array
-   (for/vector ([dim (cons num-cells (vector->list cell-shape))]) dim)
-   (apply vector-append (for/list ([a (cons arr arrs)]) (rem-array-data a)))))
+  (if (equal? cell-shape 'box)
+      (rem-array (vector num-cells) (list->vector (cons arr arrs)))
+      (rem-array
+       (for/vector ([dim (cons num-cells (vector->list cell-shape))]) dim)
+       (apply vector-append (for/list ([a (cons arr arrs)])
+                              (rem-array-data a))))))
 
 
 
@@ -315,6 +324,23 @@
           (struct rem-box ([contents rem-array?]))))
 (define-struct rem-box (contents)
   #:transparent)
+
+;;; More permissive variants of rem-array functions
+;; Find the shape of a Remora value (array or box)
+;; Boxes are considered to have scalar shape
+(define (rem-value-shape v)
+  (cond [(rem-array? v) (rem-array-shape v)]
+        [(rem-box? v) #()]))
+;; Find the rank of a Remora value (array or box)
+;; Boxes are considered to have scalar rank
+(define (rem-value-rank v)
+  (cond [(rem-array? v) (rem-array-rank v)]
+        [(rem-box? v) 0]))
+;; Find the data contents of a Remora value (array or box)
+;; Boxes are considered to be their own contents
+(define (rem-value-data v)
+  (cond [(rem-array? v) (rem-array-data v)]
+        [(rem-box? v) v]))
 
 
 ;; Identify which of two sequences is the prefix of the other, or return #f
