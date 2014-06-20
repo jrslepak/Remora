@@ -189,7 +189,8 @@
       ; write mode
       (format "(rem-array ~s ~s)" (rem-array-shape arr) (rem-array-data arr))
       ; print/display mode
-      (cond [(= 0 (rem-array-rank arr))
+      (cond [(for/and ([e (rem-array-data arr)]) (void? e)) ""]
+            [(= 0 (rem-array-rank arr))
              (format format-string (vector-ref (rem-array-data arr) 0))]
             [else (string-append
                    (for/fold ([str "["])
