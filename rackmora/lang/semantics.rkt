@@ -419,6 +419,40 @@
 ;; Build a scalar Remora array from a Racket value
 (define (scalar v) (rem-array #() (vector-immutable v)))
 
+;; Extract a racket value from a scalar Remora array
+(provide
+ (contract-out
+  (scalar->atom (-> (λ (arr) (and (rem-array? arr)
+                                  (equal? (rem-array-shape arr) #())))
+                    any/c))))
+(define (scalar->atom a) (vector-ref (rem-array-data a) 0))
+
+;; Build a Remora array from a nested Racket list
+(provide
+ (contract-out
+  (list->array (-> regular-list? rem-array?))))
+(define (list->array xs)
+  (cond [(empty? xs) (rem-array #(0) #())]
+        [(list? (first xs))
+         (apply build-vec (for/list ([x xs]) (list->array x)))]
+        [else (apply build-vec (for/list ([x xs]) (scalar x)))]))
+;; Check whether a nested list is regular (non-ragged)
+(define (regular-list? xs)
+  (and (list? xs)
+       (cond [(empty? xs) #t]
+             [(for/and ([x xs]) (not (list? x))) #t]
+             [(for/and ([x xs]) (and (regular-list? x)
+                                     (equal? (length x)
+                                             (length (first xs))))) #t]
+             [else #f])))
+(module+ test
+  (check-false (regular-list? 'a))
+  (check-true (regular-list? '()))
+  (check-true (regular-list? '(a b c)))
+  (check-true (regular-list? '((a b c)(a b c))))
+  (check-true (regular-list? '(((a b c)(a b c))((a b c)(a b c)))))
+  (check-false (regular-list? '(((a b c)(a b))((a b c)(a b c))))))
+
 ;; Apply what may be a Remora array or a Racket procedure to some Remora arrays,
 ;; with a possible result shape annotation
 (provide (contract-out
