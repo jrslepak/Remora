@@ -585,6 +585,14 @@
    (vector
     (Rλ ([arr 'all]) (rem-array #() (vector (print arr)))))))
 
+;; read a whole array structure
+(define R_read
+  (rem-array
+   #()
+   (vector
+    (Rλ ([port 0]) (list->array (read (vector-ref (rem-array-data port) 0)))))))
+
+
 ;; right fold a list of Remora arrays using a Remora function array
 (define (rem-foldr op base arrays)
   (cond [(empty? arrays) base]
