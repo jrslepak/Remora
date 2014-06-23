@@ -369,7 +369,8 @@
                               exact-nonnegative-integer?
                               (vectorof any/c)))))
 (define (subvector vec offset size)
-  (vector->immutable-vector (vector-take (vector-drop vec offset) size)))
+  (for/vector #:length size ([i (in-range offset (+ offset size))])
+    (vector-ref vec i)))
 (module+ test
   (check-equal? (subvector #(2 4 6 3 5 7) 1 3) #(4 6 3))
   (check-equal? (subvector #(2 4 6 3 5 7) 4 2) #(5 7))
