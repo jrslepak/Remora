@@ -256,6 +256,24 @@
    (remora (alit (3 6) 0 1 2 3 20 30 4 5 6 7 40 50 8 9 10 11 60 70))))
 
 
+;; randomly choose items from an array without replacement
+(define R_deal
+  (rem-array
+   #()
+   (vector
+    (Rλ ([count 0]
+         [arr 'all])
+        (define cell-shape (vector-drop (rem-array-shape arr) 1))
+        (define cells (array->cell-list arr -1))
+        (define shuffled (shuffle cells))
+        (define first-cells (take shuffled
+                                  (vector-ref (rem-array-data count) 0)))
+        (cell-list->array first-cells
+                          (rem-array-data count)
+                          cell-shape)))))
+;; randomly permute a list
+(remora (def R_shuffle (fn ((xs 'all)) (R_deal (R_tally xs) xs))))
+
 ;; Express a number in a given radix sequence
 (define (antibase radix num)
   (define (antibase-internal radix num)
@@ -566,3 +584,46 @@
    #()
    (vector
     (Rλ ([arr 'all]) (rem-array #() (vector (print arr)))))))
+
+;; right fold a list of Remora arrays using a Remora function array
+(define (rem-foldr op base arrays)
+  (cond [(empty? arrays) base]
+        [else (remora-apply op
+                            (first arrays)
+                            (rem-foldr op base (rest arrays)))]))
+(define R_foldr
+  (rem-array
+   #()
+   (vector
+    (Rλ ([op 'all] [base 'all] [arr 'all])
+        (rem-foldr op base (array->cell-list arr -1))))))
+(module+ test
+  (check-equal? (remora (R_foldr + 0 (array 1 2 3 4)))
+                (remora 10))
+  (check-equal? (remora (R_foldr - 0 (array 1 2 3 4)))
+                (remora -2))
+  (check-equal? (remora (R_foldr (array + -) 0 (array 1 2 3 4)))
+                (remora (array 10 -2))))
+
+;; left fold a list of Remora arrays using a Remora function array
+(define (rem-foldl op base arrays)
+  (cond [(empty? arrays) base]
+        [else
+         (rem-foldl op (remora-apply op base (first arrays)) (rest arrays))
+         #;(remora-apply op
+                         (first arrays)
+                         (rem-foldr op base (rest arrays)))]))
+(define R_foldl
+  (rem-array
+   #()
+   (vector
+    (Rλ ([op 'all] [base 'all] [arr 'all])
+        (rem-foldl op base (array->cell-list arr -1))))))
+(module+ test
+  (check-equal? (remora (R_foldl + 0 (array 1 2 3 4)))
+                (remora 10))
+  (check-equal? (remora (R_foldl - 0 (array 1 2 3 4)))
+                (remora -10))
+  (check-equal? (remora (R_foldl (array + -) 0 (array 1 2 3 4)))
+                (remora (array 10 -10))))
+
