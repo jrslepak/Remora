@@ -29,4 +29,6 @@
 (define-syntax (remora-top-interaction stx)
   (syntax-parse stx
     [(_ body ...)
-     #'(remora (body ...))]))
+     #'(remora (body ...))]
+    [(_ . body)
+     #'(remora body)]))
