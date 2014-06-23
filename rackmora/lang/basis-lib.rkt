@@ -635,3 +635,14 @@
   (check-equal? (remora (R_foldl (array + -) 0 (array 1 2 3 4)))
                 (remora (array 10 -10))))
 
+
+;; Extract a box's contents
+;; Applying this to an array of boxes risks producing result cells with
+;; mismatching shapes.
+(define R_unsafe-unbox
+  (rem-array #()
+             (vector
+              (Rλ ([b 0])
+                  (if (rem-box? b)
+                      (rem-box-contents b)
+                      (printf "oops, b is ~s\n" b))))))
