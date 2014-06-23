@@ -35,7 +35,7 @@
   (when (debug-mode) (printf "\n\nResult shape is ~v\n" result-shape))
   
   ; check whether args actually are Remora arrays
-  (unless (for/and [(arr args)] (rem-array? arr))
+  (unless (for/and [(arr args)] (or (rem-array? arr) (rem-box? arr)))
     (error "Remora arrays can only by applied to Remora arrays" fun args))
   (when (debug-mode) (printf "checked for Remora array arguments\n"))
   
@@ -66,27 +66,27 @@
           ([arr args]
            [r expected-rank])
           (prefix-max 
-           (vector-drop-right (rem-array-shape arr) r)
+           (vector-drop-right (rem-value-shape arr) r)
            max-frame))
         (error "Incompatible argument frames"
-               (cons (rem-array-shape fun)
+               (cons (rem-value-shape fun)
                      (for/list ([arr args]
                                 [r expected-rank])
-                       (vector-drop-right (rem-array-shape arr) r))))))
+                       (vector-drop-right (rem-value-shape arr) r))))))
   (when (debug-mode) (printf "principal-frame = ~v\n" principal-frame))
   
   ; compute argument cell sizes
   (define cell-sizes
     (for/list ([arr args]
                [r expected-rank])
-      (sequence-fold * 1 (vector-take-right (rem-array-shape arr) r))))
+      (sequence-fold * 1 (vector-take-right (rem-value-shape arr) r))))
   (when (debug-mode) (printf "cell-sizes = ~v\n" cell-sizes))
   
   ; compute argument frame sizes
   (define frame-sizes
     (for/list ([arr args]
                [r expected-rank])
-      (sequence-fold * 1 (vector-drop-right (rem-array-shape arr) r))))
+      (sequence-fold * 1 (vector-drop-right (rem-value-shape arr) r))))
   (when (debug-mode) (printf "frame-sizes = ~v\n" frame-sizes))
   
   ; compute each result cell
@@ -118,22 +118,24 @@
            (printf
             " -- ~v\n"
             (rem-array
-             (vector-take-right (rem-array-shape arr) r)
-             (subvector (rem-array-data arr)
+             (vector-take-right (rem-value-shape arr) r)
+             (subvector (rem-value-data arr)
                         (* csize
                            (quotient
                             cell-id
                             (quotient (sequence-fold * 1 principal-frame)
                                       fsize)))
                         csize))))
-         (rem-array
-          (vector-take-right (rem-array-shape arr) r)
-          (subvector (rem-array-data arr)
-                     (* csize
-                        (quotient cell-id
-                                  (quotient (sequence-fold * 1 principal-frame)
-                                            fsize)))
-                     csize))))))
+         (if (rem-box? arr)
+             arr
+             (rem-array
+              (vector-take-right (rem-value-shape arr) r)
+              (subvector (rem-value-data arr)
+                         (* csize
+                            (quotient cell-id
+                                      (quotient (sequence-fold * 1 principal-frame)
+                                                fsize)))
+                         csize)))))))
   (when (debug-mode) (printf "result-cells = ~v\n" result-cells))
   
   (when (debug-mode)
@@ -461,7 +463,7 @@
                               (or/c symbol?
                                     (vectorof exact-nonnegative-integer?)))
                              #:rest
-                             (listof rem-array?)
+                             (listof (or/c rem-array? rem-box?))
                              rem-array?))))
 (define (remora-apply
          fun
