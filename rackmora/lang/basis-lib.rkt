@@ -65,6 +65,8 @@
 (define R_> (rem-array #() (vector (rem-scalar-proc > 2))))
 (define R_>= (rem-array #() (vector (rem-scalar-proc >= 2))))
 
+(define R_bool->int
+  (rem-array #() (vector (rem-scalar-proc (λ (b) (if b 1 0)) 1))))
 
 
 
