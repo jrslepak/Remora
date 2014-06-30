@@ -32,9 +32,9 @@
 
 ;; Split the training set into spam and legit messages
 (def spam? (fn ((message 1)) (= 1 (R_tail message))))
-(def train-spam (R_unsafe-unbox (R_filter spam?
+(def train-spam (R_unsafe-unbox (R_filter (spam? train-set)
                                           train-set)))
-(def train-legit (R_unsafe-unbox (R_filter (fn ((x 1)) (not (spam? x)))
+(def train-legit (R_unsafe-unbox (R_filter (not (spam? train-set))
                                            train-set)))
 
 ;; How many spam and legit messages had each feature below and above the mean?

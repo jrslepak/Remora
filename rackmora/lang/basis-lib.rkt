@@ -746,27 +746,30 @@
   (rem-array
    #()
    (vector
-    (Rλ ([op 'all] [arr 'all])
-        (define cell-shape (vector-drop (rem-array-shape arr) 1))
-        (define old-cells (array->cell-list arr -1))
-        (define new-cells (filter (λ (x) (scalar->atom (remora (op x))))
-                                  old-cells))
+    (Rλ ([bools 1] [items 'all])
+        (define cell-shape (vector-drop (rem-array-shape items) 1))
+        (define old-cells (array->cell-list items -1))
+        (define choices (rem-array-data bools))
+        (define new-cells 
+          (for/list ([b choices] [c old-cells] #:when b) c))
         (rem-box
          (cell-list->array new-cells
                            (vector (length new-cells))
                            cell-shape))))))
 (module+ test
-  (check-equal? (remora (R_filter integer? (array 1 2 #t 3 #f 4)))
+  (check-equal? (remora (R_filter (array #t #t #f #t #f #t)
+                                  (array 1 2 #t 3 #f 4)))
                 (remora (box (array 1 2 3 4))))
-  (check-equal? (remora (R_filter (compose not integer?) (array 1 2 #t 3 #f 4)))
+  (check-equal? (remora (R_filter (array #f #f #t #f #t #f)
+                                  (array 1 2 #t 3 #f 4)))
                 (remora (box (array #t #f))))
   (check-equal? (remora ((rerank ('all 1) R_filter)
-                         integer?
-                         (array (array 1 2 #t)
-                                (array 3 #f 4))))
-                (remora (array (box (array 1 2))
-                               (box (array 3 4)))))
-  (check-equal? (remora (R_filter (fn ((vec 1)) (= (R_tail vec) 0))
+                         (array #t #f #t)
+                         (array (array 1 2 3)
+                                (array 4 5 6))))
+                (remora (array (box (array 1 3))
+                               (box (array 4 6)))))
+  (check-equal? (remora (R_filter (array #t #f #f #t)
                                   (array (array 1 2 3 0)
                                          (array 0 1 3 2)
                                          (array 2 4 5 9)
