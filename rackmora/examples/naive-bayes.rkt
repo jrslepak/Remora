@@ -68,22 +68,13 @@
 
 ;;; Test phase
 
-;; Remora currently lacks a good conditional form, but an eager number-selecting
-;; function suffices for now.
-;; TODO: hammer out design for conditional execution
-(def choose
-  (fn ((cond 0) (a 'all) (b 'all))
-      (#r('all 'all)R_or
-         (#r(0 'all)R_and cond a)
-         b)))
-
 ;; Consider which side of the mean each feature is on. There's a probability of
 ;; its being on that side if the message is spam. The product of those
 ;; probabilities is this message's probability of that high/low arrangement if
 ;; it is spam. (Similar for legit messages)
 (def threshold-side-prob
   (fn ((val 0) (threshold 0) (below-prob 0))
-      (choose (< val threshold) below-prob (- 1 below-prob))))
+      (R_select (< val threshold) below-prob (- 1 below-prob))))
 
 ;; Decide how confident we are in a message's spam/legit status
 (def classify
@@ -143,8 +134,8 @@
   (positive? (R_signum (* (sub1 (* 2 (#r(1)R_tail test-set))) guesses))))
 
 (printf "correctly classified ~v of ~v test messages\n"
-        (R_foldr + 0 (choose results 1 0))
+        (R_foldr + 0 (R_select results 1 0))
         (R_tally results))
 (printf "\taccuracy ~v\n"
         (exact->inexact
-         (/ (R_foldr + 0 (choose results 1 0)) (R_tally results))))
+         (/ (R_foldr + 0 (R_select results 1 0)) (R_tally results))))

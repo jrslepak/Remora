@@ -776,3 +776,21 @@
                                          (array 6 6 6 0))))
                 (remora (box (array (array 1 2 3 0)
                                     (array 6 6 6 0))))))
+
+(define R_select
+  (rem-array
+   #()
+   (vector
+    (Rλ ([bool 0] [a 'all] [b 'all])
+        (if (scalar->atom bool) a b)))))
+(module+ test
+  (check-equal? (remora (R_select #t (array 1 2 3) (array 4 5 6)))
+                (remora (array 1 2 3)))
+  (check-equal? (remora (R_select #f (array 1 2 3) (array 4 5 6)))
+                (remora (array 4 5 6)))
+  (check-equal? (remora (R_select (array #t #f) (array 1 2 3) (array 4 5 6)))
+                (remora (array (array 1 2 3) (array 4 5 6))))
+  (check-equal? (remora ((rerank (0 0 0) R_select) (array #t #f #t)
+                                                   (array 1 2 3)
+                                                   (array 4 5 6)))
+                (remora (array 1 5 3))))
