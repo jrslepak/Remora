@@ -6,13 +6,16 @@
          racket/vector
          racket/list
          racket/contract
-         racket/sequence)
+         racket/sequence
+         racket/provide
+         (for-syntax racket/base))
 (module+ test
   (require rackunit))
 
-(provide (except-out (all-defined-out)
-                     array->cell-list
-                     cell-list->array))
+;; Remora primops are prefixed with "R_"
+(provide (filtered-out
+          (λ (name) (if (regexp-match #rx"^R_" name) name #f))
+          (all-defined-out)))
 
 
 (define R_id (rem-array #() (vector (rem-scalar-proc (λ (x) x) 1))))
