@@ -401,11 +401,48 @@
                 (remora (alit (2 3) 1 0 0 1 1 3))))
 
 
-(define (scan op xs)
+(define (scan op init xs)
   (reverse
-   (for/fold ([acc (list (sequence-ref xs 0))])
-     ([elt (sequence-tail xs 1)])
+   (for/fold ([acc (list init) #;(list (sequence-ref xs 0))])
+     ([elt xs #;(sequence-tail xs 1)])
      (cons (op elt (first acc)) acc))))
+
+(define R_scan
+  (rem-array
+   #()
+   (vector
+    (Rλ ([op 'all] [init 'all] [xs 'all])
+        (define input-items (array->cell-list xs -1))
+        ;(printf "input items: ~s\n" input-items)
+        (define result-items
+          (scan (λ (left right)
+                  ;(printf "emitted ~s, next is ~s\n" left right)
+                  (remora-apply op left right))
+                init
+                input-items))
+        ;(printf "result items: ~s\n" result-items)
+        (if (empty? result-items)
+            (cell-list->array
+             result-items
+             (vector (length result-items))
+             (rem-array-shape init))
+            (cell-list->array
+             result-items
+             (vector (length result-items))))))))
+(module+ test
+  (check-equal? (remora (R_scan + (array 0 0) (array (array 1 2)
+                                                     (array 3 4))))
+                (remora (array (array 0 0)
+                               (array 1 2)
+                               (array 4 6))))
+  (check-equal? (remora ((rerank ('all 'all 1) R_scan)
+                         +
+                         0 (array (array 1 2)
+                                  (array 3 4))))
+                (remora (array (array 0 1 3)
+                               (array 0 3 7)))))
+
+
 ; Interpret a digit list in a given radix
 (define (base radix digits)
   ; if radix is too short, extend by copying its first element
@@ -424,8 +461,10 @@
                   0)
                 digits)
         digits))
-  (for/sum ([place-value (reverse (scan * (cons 1 (reverse
-                                                   (rest padded-radix)))))]
+  (for/sum ([place-value (reverse (scan * 1 (reverse
+                                             (rest padded-radix))
+                                        #;(cons 1 (reverse
+                                                     (rest padded-radix)))))]
             [digit padded-digits])
     (* place-value digit)))
 (define R_base
@@ -797,3 +836,26 @@
                                                    (array 1 2 3)
                                                    (array 4 5 6)))
                 (remora (array 1 5 3))))
+
+;; Enable "sliding window" computation over a vector. Subsequences of specified
+;; length are aligned along the major axis for easy folding.
+(define R_window
+  (rem-array
+   #()
+   (vector
+    (Rλ ([length 0] [arr 'all])
+        (R_rotate arr (R_unsafe-unbox (R_iota (R_itemize length))))))))
+(module+ test
+  (check-equal? (remora (R_window 3 (array 1 2 3 4 5 6 7 8 9 10)))
+                (remora (array (array 1 2 3 4 5 6 7 8 9 10)
+                               (array 2 3 4 5 6 7 8 9 10 1)
+                               (array 3 4 5 6 7 8 9 10 1 2))))
+  (check-equal? (remora ((rerank (0 1) R_window) 3
+                                                 (array (array 1 2 3 4 5)
+                                                        (array 6 7 8 9 10))))
+                (remora [array [array [array 1 2 3 4 5]
+                                      [array 2 3 4 5 1]
+                                      [array 3 4 5 1 2]]
+                               [array [array 6 7 8 9 10]
+                                      [array 7 8 9 10 6]
+                                      [array 8 9 10 6 7]]])))
