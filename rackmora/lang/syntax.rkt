@@ -42,7 +42,7 @@
     #:description "Remora atom"
     #:literals (fn)
     (pattern const:CONST)
-    (pattern (fn ((var:id r:RANK) ...) body)))
+    (pattern (fn ((var:id r:RANK) ...) body ...)))
   (define-syntax-class ALITERAL
     #:description "Remora array literal"
     #:literals (array alit)
@@ -124,9 +124,9 @@
   (syntax-parse stx
     #:literals (fn)
     [(_ const:CONST) #'const]
-    [(_ (fn ((arg:id rank:RANK) ...) body:expr))
+    [(_ (fn ((arg:id rank:RANK) ...) body:expr ...))
      ((remora-macro-transformer (syntax-local-value #'fn))
-      #'(fn ((arg rank) ...) body))]
+      #'(fn ((arg rank) ...) body ...))]
     [(_ otherwise)
      (error "could not handle atom:" #'otherwise)]))
 
