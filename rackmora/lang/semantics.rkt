@@ -156,6 +156,9 @@
       [(for/and ([c result-cells])
          (equal? (rem-value-shape (vector-ref result-cells 0))
                  (rem-value-shape c)))
+       (when (debug-mode)
+         (printf "using cell shape ~v\n"
+                 (rem-value-shape (vector-ref result-cells 0))))
        (vector-append principal-frame
                       (rem-value-shape (vector-ref result-cells 0)))]
       [else (error "Result cells have mismatched shapes: ~v" result-cells)]))
@@ -169,11 +172,18 @@
         (apply vector-append
                (for/list ([r result-cells])
                  (rem-value-data r)))))
-  (when (debug-mode) (printf "final-data = ~v\n\n\n" final-data))
-  
+  (when (debug-mode)
+    (printf "final-data = ~v\n" final-data)
+    (printf "(equal? #() final-shape) = ~v\n"
+            (equal? #() final-shape))
+    (printf "(rem-box? (vector-ref final-data 0)) = ~v\n"
+            (rem-box? (vector-ref final-data 0))))
   (if (and (equal? #() final-shape)
            (rem-box? (vector-ref final-data 0)))
-      (vector-ref final-data 0)
+      (begin (when (debug-mode)
+               (printf "returning just the box ~v\n"
+                       (vector-ref final-data 0)))
+             (vector-ref final-data 0))
       (rem-array final-shape final-data)))
 
 ;; Contract constructor for vectors of specified length
