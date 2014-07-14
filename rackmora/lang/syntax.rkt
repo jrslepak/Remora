@@ -16,6 +16,7 @@
          alit
          array
          apply/shape
+         :
          box
          unbox
          vec
@@ -161,14 +162,14 @@
 (define-remora-syntax (apply/shape stx)
   (syntax-parse stx
     [(_ shp fun arg ...)
-     #'(remora-apply (rem-array->vector shp)
-                     (remora fun)
+     #'(remora-apply (remora fun)
+                     #:result-shape (rem-array->vector (remora shp))
                      (remora arg) ...)]))
 (define-remora-syntax (: stx)
   (syntax-parse stx
     [(_ shp fun arg ...)
-     #'(remora-apply (rem-array->vector shp)
-                     (remora fun)
+     #'(remora-apply (remora fun)
+                     #:result-shape (rem-array->vector (remora shp))
                      (remora arg) ...)]))
 ; or should the shape only get evaluated if it turns out to be needed?
 ; if it's a by-need thing, will need to make it a thunk and have apply-rem-array
