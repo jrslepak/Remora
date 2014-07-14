@@ -234,8 +234,8 @@
 ; (def name defn-or-expr ... expr)
 (define-remora-syntax (def stx)
   (syntax-parse stx
-    [(_ name defn-or-expr ...)
-     #'(define name (remora defn-or-expr) ...)]))
+    [(_ name defn-or-expr )
+     #'(define name (remora defn-or-expr) )]))
 
 #;
 (define-remora-syntax (require stx)
