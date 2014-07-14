@@ -33,3 +33,6 @@
    importing & exporting in #lang mode;
    library/EDSL mode}
 
+@local-table-of-contents[]
+
+@include-section["arrays.scrbl"]
