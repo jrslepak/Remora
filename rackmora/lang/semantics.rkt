@@ -201,7 +201,9 @@
       ; write mode
       (format "(rem-array ~s ~s)" (rem-array-shape arr) (rem-array-data arr))
       ; print/display mode
-      (cond [(for/and ([e (rem-array-data arr)]) (void? e)) ""]
+      (cond [(and (not (= 0 (vector-length (rem-array-data arr))))
+                  (for/and ([e (rem-array-data arr)]) (void? e)))
+             ""]
             [(= 0 (rem-array-rank arr))
              (format format-string (vector-ref (rem-array-data arr) 0))]
             [else (string-append
@@ -302,30 +304,32 @@
 
 ;; Construct an array as a vector of -1-cells
 (provide
- (contract-out (build-vec (->* ((or/c rem-array? rem-box?))
+ (contract-out (build-vec (->* ()
                                #:rest (listof (or/c rem-array? rem-box?))
                                rem-array?))))
-(define (build-vec arr . arrs)
+(define (build-vec . arrs)
   (define (only-unique-element xs)
     #;
     (when (equal? 0 (sequence-length xs))
-           (error "looking for unique element in empty sequence"))
+      (error "looking for unique element in empty sequence"))
     (for/fold ([elt (sequence-ref xs 0)])
       ([x xs])
       (if (equal? x elt)
           x
           (error "cannot use vec on arrays of mismatched shape"))))
   (define cell-shape
-    (only-unique-element
-     (for/list ([a (cons arr arrs)])
-       (cond [(rem-array? a) (rem-array-shape a)]
-             [(rem-box? a) 'box]))))
-  (define num-cells (length (cons arr arrs)))
+    (if (empty? arrs)
+        #()
+        (only-unique-element
+         (for/list ([a arrs])
+           (cond [(rem-array? a) (rem-array-shape a)]
+                 [(rem-box? a) 'box])))))
+  (define num-cells (length arrs))
   (if (equal? cell-shape 'box)
-      (rem-array (vector num-cells) (list->vector (cons arr arrs)))
+      (rem-array (vector num-cells) (list->vector arrs))
       (rem-array
        (for/vector ([dim (cons num-cells (vector->list cell-shape))]) dim)
-       (apply vector-append (for/list ([a (cons arr arrs)])
+       (apply vector-append (for/list ([a arrs])
                               (rem-array-data a))))))
 
 

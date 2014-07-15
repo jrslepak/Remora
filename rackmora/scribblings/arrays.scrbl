@@ -48,10 +48,11 @@ be written @code[#:lang "rackmora"]{#A(3 2)(1 0 2 3 2 1)}.
 @defform[(vec expr ...+)]{
 Array constructor: All @racket[expr]s must evaluate to arrays with the same
 shape. The number of fragments given is prepended to the fragments' shape to
-form the resulting array's shape. The resulting array contains the concatenated
-contents of the given fragments. This form is more flexible than @racket[alit]
-as atoms which appear in expression position are automatically promoted to
-scalars.
+form the resulting array's shape. If there are no fragments, the resulting array
+has shape @code[#:lang "rackmora"]{[0]}. The resulting array contains the
+concatenated contents of the given fragments. This form is more flexible than
+@racket[alit] as atoms which appear in expression position are automatically
+promoted to scalars.
 
 @racket[(vec (alit (3) 1 0 2) (alit (3) 3 2 1))] and
 @racket[(vec (vec 1 0 2) (vec 3 2 1))] both produce the same 2 × 3
