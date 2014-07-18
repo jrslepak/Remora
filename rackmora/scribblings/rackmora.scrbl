@@ -36,3 +36,5 @@
 @local-table-of-contents[]
 
 @include-section["arrays.scrbl"]
+@include-section["functions.scrbl"]
+@include-section["application.scrbl"]
