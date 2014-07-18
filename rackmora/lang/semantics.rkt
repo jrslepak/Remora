@@ -92,50 +92,58 @@
   ; compute each result cell
   (define result-cells
     (for/vector ([cell-id (sequence-fold * 1 principal-frame)])
+      (define function-cell-id
+        (quotient cell-id
+                   (quotient (sequence-fold * 1 principal-frame)
+                             (sequence-fold * 1 (rem-array-shape fun)))))
       (when (debug-mode)
         (printf
-         "using function cell ~v\n taken from ~v :: ~v\n"
-         (quotient cell-id
-                   (quotient (sequence-fold * 1 principal-frame)
-                             (sequence-fold * 1 (rem-array-shape fun))))
-         (rem-array-data fun)
-         (quotient cell-id
-                   (quotient (sequence-fold * 1 principal-frame)
-                             (sequence-fold * 1 (rem-array-shape fun))))))
-      (apply
-       (vector-ref
-        (rem-array-data fun)
-        (quotient cell-id
-                  (quotient (sequence-fold * 1 principal-frame)
-                            (sequence-fold * 1 (rem-array-shape fun)))))
-       (for/list ([arr args]
-                  [csize cell-sizes]
-                  [fsize frame-sizes]
-                  [r expected-rank])
-         (when (debug-mode)
-           (printf "  arg cell #~v, csize ~v, pfr ~v, fr ~v"
-                   cell-id csize (sequence-fold * 1 principal-frame) fsize)
-           (printf
-            " -- ~v\n"
-            (rem-array
-             (vector-take-right (rem-value-shape arr) r)
-             (subvector (rem-value-data arr)
-                        (* csize
-                           (quotient
-                            cell-id
-                            (quotient (sequence-fold * 1 principal-frame)
-                                      fsize)))
-                        csize))))
-         (if (rem-box? arr)
-             arr
-             (rem-array
-              (vector-take-right (rem-value-shape arr) r)
-              (subvector (rem-value-data arr)
-                         (* csize
-                            (quotient cell-id
-                                      (quotient (sequence-fold * 1 principal-frame)
-                                                fsize)))
-                         csize)))))))
+         "using function cell #~v\n taken from ~v\n"
+         function-cell-id
+         (rem-array-data fun)))
+      (define arg-cells
+        (for/list ([arr args]
+                   [csize cell-sizes]
+                   [fsize frame-sizes]
+                   [r expected-rank])
+          (define offset
+            (* csize
+               (quotient cell-id
+                         (quotient (sequence-fold * 1 principal-frame)
+                                   fsize))))
+          (when (debug-mode)
+            (printf "  arg cell #~v, csize ~v, pfr ~v, fr ~v"
+                    cell-id csize (sequence-fold * 1 principal-frame) fsize))
+          (define arg-cell
+            (cond
+              ; if the argument is itself a box, it is its own sole cell
+              [(rem-box? arr)
+               (when (debug-mode) (printf " (argument is a box)"))
+               arr]
+              ; if we are taking a single box from an array of boxes,
+              ; the cell is the box, not a scalar wrapper around the box
+              [(and (equal? csize 1)
+                    (rem-box? (vector-ref (rem-value-data arr) offset)))
+               (when (debug-mode) (printf " (cell is a box)"))
+               (vector-ref (rem-value-data arr) offset)]
+              [else
+               (when (debug-mode) (printf " (not single box)"))
+               (rem-array
+                (vector-take-right (rem-value-shape arr) r)
+                (subvector
+                 (rem-value-data arr)
+                 offset
+                 csize))]))
+          (when (debug-mode)
+            (printf " -- ~v\n" arg-cell))
+          arg-cell))
+      (when (debug-mode)
+        (printf " function: ~v\n"
+                (vector-ref (rem-array-data fun)
+                            function-cell-id))
+        (printf " arg cells: ~v\n" arg-cells))
+      (apply (vector-ref (rem-array-data fun) function-cell-id)
+             arg-cells)))
   (when (debug-mode) (printf "result-cells = ~v\n" result-cells))
   
   (when (debug-mode)
@@ -358,6 +366,8 @@
 (define (rem-value-data v)
   (cond [(rem-array? v) (rem-array-data v)]
         [(rem-box? v) v]))
+;; Determine whether a value is a Remora value
+(define (rem-value? v) (or (rem-array? v) (rem-box? v)))
 
 
 ;; Identify which of two sequences is the prefix of the other, or return #f
@@ -509,7 +519,10 @@
                (cond [(rem-proc? elt) elt]
                      [(procedure? elt) (rem-scalar-proc elt arity)]))))
 
-(provide (contract-out (racket->remora (-> any/c rem-array?))))
+(provide (contract-out (racket->remora (-> any/c rem-value?))))
 (define (racket->remora val)
-  (cond [(rem-array? val) val]
-        [else (rem-array #() (vector val))]))
+  (when (debug-mode) (printf "converting ~v\n" val))
+  (cond [(rem-value? val) (when (debug-mode) (printf "  keeping as is\n"))
+                          val]
+        [else (when (debug-mode) (printf "  wrapping\n"))
+              (rem-array #() (vector val))]))
