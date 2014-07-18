@@ -1,4 +1,7 @@
 #lang scribble/manual
+@require[(for-label (except-in racket/base
+                               box unbox)
+                    rackmora)]
 
 @title[#:tag '("rackmora" "remora")]{Array-oriented programming}
 

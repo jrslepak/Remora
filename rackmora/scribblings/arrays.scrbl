@@ -1,5 +1,9 @@
 #lang scribble/manual
-@;@require[(for-label rackmora)]
+@require[(for-label (except-in racket/base
+                               box unbox)
+                    rackmora)]
+@;@declare-exporting[rackmora]
+@defmodulelang[rackmora]
 @title{Arrays}
 
 All computation in array-oriented programming is performed on arrays. An array
@@ -33,11 +37,11 @@ are converted to scalar array literals.
 
 @defform[(alit (natural ...) atom ...)]{
 Array literal: Produces an array of the given atoms arranged according
-to the given shape, @racket[[natural ...]].
+to the given shape, @code[#:lang "rackmora"]{[natural ...]}.
 
 The 2 × 3 matrix whose rows are @code[#:lang "rackmora"]{[1 0 2]} and
 @code[#:lang "rackmora"]{[3 2 1]} can be described with the array literal
-@racket[(alit (3 2) 1 0 2 3 2 1)].
+@code[#:lang "rackmora"]{(alit (3 2) 1 0 2 3 2 1)}.
 
 @;{TODO: variables are rendering weird in 'code' fragments}
 In @tt{#lang rackmora}, @code[#:lang "rackmora"]{#A(dimension ...)(atom ...)}
@@ -46,17 +50,17 @@ be written @code[#:lang "rackmora"]{#A(3 2)(1 0 2 3 2 1)}.
 }
 
 @defform[(vec expr ...+)]{
-Array constructor: All @racket[expr]s must evaluate to arrays with the same
-shape. The number of fragments given is prepended to the fragments' shape to
-form the resulting array's shape. If there are no fragments, the resulting array
-has shape @code[#:lang "rackmora"]{[0]}. The resulting array contains the
-concatenated contents of the given fragments. This form is more flexible than
-@racket[alit] as atoms which appear in expression position are automatically
-promoted to scalars.
+Array constructor: All @code[#:lang "rackmora"]{expr}s must evaluate to arrays
+with the same shape. The number of fragments given is prepended to the
+fragments' shape to form the resulting array's shape. If there are no fragments,
+the resulting array has shape @code[#:lang "rackmora"]{[0]}. The resulting array
+contains the concatenated contents of the given fragments. This form is more
+flexible than @code[#:lang "rackmora"]{alit} as atoms which appear in expression
+position are automatically promoted to scalars.
 
-@racket[(vec (alit (3) 1 0 2) (alit (3) 3 2 1))] and
-@racket[(vec (vec 1 0 2) (vec 3 2 1))] both produce the same 2 × 3
-matrix as @racket[(alit (3 2) 1 0 2 3 2 1)].
+@code[#:lang "rackmora"]{(vec (alit (3) 1 0 2) (alit (3) 3 2 1))} and
+@code[#:lang "rackmora"]{(vec (vec 1 0 2) (vec 3 2 1))} both produce the same
+2 × 3 matrix as @code[#:lang "rackmora"]{(alit (3 2) 1 0 2 3 2 1)}.
 }
 
 @defform[(array fragment ...+)]{

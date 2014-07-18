@@ -1,5 +1,9 @@
 #lang scribble/manual
+@require[(for-label (except-in racket/base
+                               box unbox)
+                    rackmora)]
 
+@defmodulelang[rackmora]
 @title{Function Application}
 
 A function application form applies an array of functions to arrays of
