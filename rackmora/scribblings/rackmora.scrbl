@@ -41,3 +41,6 @@
 @include-section["arrays.scrbl"]
 @include-section["functions.scrbl"]
 @include-section["application.scrbl"]
+@include-section["boxes.scrbl"]
+@include-section["integration.scrbl"]
+@include-section["basis-lib.scrbl"]
