@@ -8,11 +8,17 @@
 ;(provide (except-out all-defined-out mean))
 
 ;; Mean
+;;; CR shivers: tally -> length
 (def mean
   (fn ((samples 1)) (/ (foldr + 0 samples)
                        (tally samples))))
 
 
+;;; CR shivers: Indent lambda body (and other "bodies", e.g. let) 2 cols.
+;;;   Invest in remora emacs package with customised indenting.
+;;;   I'd say unbox is also a fn/let indent case.
+;;; CR shivers: Use classic semi convention, not bogus Racket ones:
+;;;   3 top level. 2 indented like code. 1 at end of line.
 ;; Variance
 (def variance
   (fn ((samples 1))
@@ -44,6 +50,8 @@
 
 ;; Convolution
 
+
+;;; CR shivers: Vas ist das R*?
 
 ;; Generate a sinusoid with given (digital) frequency and phase
 (def sinusoid
