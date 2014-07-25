@@ -20,33 +20,11 @@
 
 (define R_id (rem-array #() (vector (rem-scalar-proc (λ (x) x) 1))))
 
-(define R_+ (rem-array #() (vector (rem-scalar-proc + 2))))
-(define R_- (rem-array #() (vector (rem-scalar-proc - 2))))
-(define R_* (rem-array #() (vector (rem-scalar-proc * 2))))
-(define R_/ (rem-array #() (vector (rem-scalar-proc / 2))))
-(define R_^ (rem-array #() (vector (rem-scalar-proc expt 2))))
-
 (define R_and (rem-array #() (vector (rem-scalar-proc (λ (x y) (and x y)) 2))))
 (define R_or (rem-array #() (vector (rem-scalar-proc (λ (x y) (or x y)) 2))))
 
-(define R_ceiling (rem-array #() (vector (rem-scalar-proc ceiling 2))))
-(define R_floor (rem-array #() (vector (rem-scalar-proc floor 2))))
-
-(define R_add1 (rem-array #() (vector (rem-scalar-proc add1 1))))
-(define R_sub1 (rem-array #() (vector (rem-scalar-proc sub1 1))))
-
 (define R_neg (rem-array #() (vector (rem-scalar-proc (λ (x) (- x)) 1))))
 (define R_inv (rem-array #() (vector (rem-scalar-proc (λ (x) (/ 1 x)) 1))))
-
-(define R_exp (rem-array #() (vector (rem-scalar-proc exp 1))))
-
-(define R_sqr (rem-array #() (vector (rem-scalar-proc sqr 1))))
-(define R_sqrt (rem-array #() (vector (rem-scalar-proc sqrt 1))))
-
-(define R_gcd (rem-array #() (vector (rem-scalar-proc gcd 1))))
-(define R_lcm (rem-array #() (vector (rem-scalar-proc lcm 1))))
-
-(define R_conjugate (rem-array #() (vector (rem-scalar-proc conjugate 1))))
 
 (define R_signum
   (rem-array #() (vector (rem-scalar-proc (λ (x) (/ x (magnitude x))) 1))))
@@ -56,17 +34,6 @@
 (define R_ln (rem-array #() (vector (rem-scalar-proc log 1))))
 (define R_log (rem-array #() (vector (rem-scalar-proc (λ (x) (logb 10 x)) 1))))
 (define R_lg (rem-array #() (vector (rem-scalar-proc (λ (x) (logb 2 x)) 1))))
-
-(define R_imag-part (rem-array #() (vector (rem-scalar-proc imag-part 1))))
-(define R_real-part (rem-array #() (vector (rem-scalar-proc real-part 1))))
-(define R_magnitude (rem-array #() (vector (rem-scalar-proc magnitude 1))))
-(define R_angle (rem-array #() (vector (rem-scalar-proc angle 1))))
-
-(define R_= (rem-array #() (vector (rem-scalar-proc equal? 2))))
-(define R_< (rem-array #() (vector (rem-scalar-proc < 2))))
-(define R_<= (rem-array #() (vector (rem-scalar-proc <= 2))))
-(define R_> (rem-array #() (vector (rem-scalar-proc > 2))))
-(define R_>= (rem-array #() (vector (rem-scalar-proc >= 2))))
 
 (define R_bool->int
   (rem-array #() (vector (rem-scalar-proc (λ (b) (if b 1 0)) 1))))
@@ -372,6 +339,7 @@
 (remora (def R_shuffle (fn ((xs 'all)) (R_deal (R_tally xs) xs))))
 
 ;; Express a number in a given radix sequence
+;; TODO: permit +inf.0 so it can be used in outermost digit
 (define (antibase radix num)
   (define (antibase-internal radix num)
     (cond [(empty? radix) (list num)]
@@ -715,6 +683,7 @@
                 (remora (array #f #t #f #f))))
 
 ;; print a whole array structure (don't just lift and print atoms one-by-one)
+;; TODO: need a version of this that lets caller specify an output port
 (define R_show
   (rem-array
    #()
