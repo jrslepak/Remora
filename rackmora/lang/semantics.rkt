@@ -293,6 +293,8 @@
 ;; A Remora procedure has
 ;; - body, a Racket procedure which consumes and produces Remora arrays
 ;; - ranks, a list of the procedure's expected argument ranks
+;; TODO: tighten the contract on body to require the procedure to consume and
+;; produce arrays
 (provide
  (contract-out (struct rem-proc ([body procedure?]
                                  [ranks (listof rank?)]))))
