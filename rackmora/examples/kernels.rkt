@@ -1,8 +1,5 @@
 #lang rackmora
 (require racket/math)
-(require (rename-in (only-in racket/base + *)
-                    (+ R+)
-                    (* R*)))
 ;;; TODO: figure out why all-defined-out doesn't export def'd things but
 ;;; they can still be exported by explicitly naming them
 #;(provide (except-out all-defined-out mean))
@@ -53,13 +50,17 @@
 ;;; Convolution
 
 
-;;; CR shivers: Vas ist das R*?
-
+;;; XCR shivers: Vas ist das R*?
+;;; jrslepak: I was trying out the integration of variable-arity functions, so I
+;;;   pulled in Racket's * procedure under that name. At this point, Remora does
+;;;   not export its own *, so I've removed it. In the future, if we cut out
+;;;   support for importing Racket procedures with indeterminate arity, some
+;;;   of these multiplication exprs will have to be fixed.
 ;;; Generate a sinusoid with given (digital) frequency and phase
 (def sinusoid
   (fn ((length 0) (freq 0) (phase 0))
       (unbox count (iota [length])
-             (cos (+ (R* count freq 2 pi)
+             (cos (+ (* count freq 2 pi)
                      phase)))))
 
 
@@ -71,7 +72,7 @@
 (def goertzel-iir-step
   (fn ((freq 0))
       (fn ((next 0) (accum 1))
-          (array (- (+ next (R* 2 (cos (R* 2 pi freq)) (head accum)))
+          (array (- (+ next (* 2 (cos (* 2 pi freq)) (head accum)))
                     (tail accum))
                  (head accum)))))
 (def goertzel-iir
