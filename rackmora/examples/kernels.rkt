@@ -14,11 +14,13 @@
                        (tally samples))))
 
 
-;;; CR shivers: Indent lambda body (and other "bodies", e.g. let) 2 cols.
+;;; XCR shivers: Indent lambda body (and other "bodies", e.g. let) 2 cols.
 ;;;   Invest in remora emacs package with customised indenting.
 ;;;   I'd say unbox is also a fn/let indent case.
-;;; CR shivers: Use classic semi convention, not bogus Racket ones:
+;;; XCR shivers: Use classic semi convention, not bogus Racket ones:
 ;;;   3 top level. 2 indented like code. 1 at end of line.
+;;; jrslepak: both should be fixed in
+;;;   commit d6a370db72c775d7ed4877b0233d9d08f553ee42
 ;;; Variance
 (def variance
   (fn ((samples 1))
