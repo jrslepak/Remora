@@ -42,8 +42,8 @@ We can use this to write a function which finds the mean of a boxed vector:
 (def box-mean
   (fn ((some-box 0))
     (unbox xs some-box
-           (/ (foldr + 0 xs)
-              (tally xs)))))
+      (/ (foldr + 0 xs)
+         (tally xs)))))
 }
 Note that @code[#:lang "rackmora"]{box-mean} expects a scalar argument (a single
 box) but operates on the box's contents as an aggregate an produces an unboxed

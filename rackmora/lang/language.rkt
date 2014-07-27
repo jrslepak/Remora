@@ -10,8 +10,8 @@
          (rename-in (only-in racket/base #%module-begin)
                     [#%module-begin #%racket-module-begin]))
 
-;; Take all Remora primitive operations from the basis library, stripping the
-;; "R_" prefix
+;;; Take all Remora primitive operations from the basis library, stripping the
+;;; "R_" prefix
 (require (filtered-in (λ (name)
                         (define new-name
                           (if (regexp-match #rx"^R_" name)
@@ -22,8 +22,8 @@
                         new-name)
                       "basis-lib.rkt"))
 
-;; Take everything from racket/base that doesn't have the same name as a
-;; (prefix stripped) Remora primop or anything else from Remora's internals
+;;; Take everything from racket/base that doesn't have the same name as a
+;;; (prefix stripped) Remora primop or anything else from Remora's internals
 (require (subtract-in racket/base
                       (filtered-in
                        (λ (name)
@@ -37,8 +37,8 @@
                        "basis-lib.rkt")
                       "syntax.rkt"
                       "semantics.rkt"))
-;; Prefix the reader's exports so they don't conflict with things from
-;; racket/base or the Remora basis library
+;;; Prefix the reader's exports so they don't conflict with things from
+;;; racket/base or the Remora basis library
 (require (filtered-in
           (λ (name) (string-append "READER_" name))
           "reader.rkt"))

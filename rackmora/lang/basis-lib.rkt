@@ -12,7 +12,7 @@
 (module+ test
   (require rackunit))
 
-;; Remora primops are prefixed with "R_"
+;;; Remora primops are prefixed with "R_"
 (provide (filtered-out
           (λ (name) (if (regexp-match #rx"^R_" name) name #f))
           (all-defined-out)))
@@ -40,16 +40,14 @@
 
 
 
-; head, tail, behead, curtail really consume an arg with major axis length + 1,
-; but the Nat index argument is effectively irrelevant
-; "cell-shape" here refers to the -1-cells which will be pushed around
-; "length" is how many -1-cells there are
+;;; "cell-shape" here refers to the -1-cells which will be pushed around
+;;; "length" is how many -1-cells there are
 (define R_head
   (rem-array
    #()
    (vector
     (Rλ ([arr 'all])
-               ; operates on the -1-cells
+               ;; operates on the -1-cells
                (define cell-shape (vector-drop (rem-array-shape arr) 1))
                (rem-array (vector-drop (rem-array-shape arr) 1)
                           (vector-take (rem-array-data arr)
@@ -71,7 +69,7 @@
    #()
    (vector
     (Rλ ([arr 'all])
-        ; operates on the -1-cells
+        ;; operates on the -1-cells
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-array (vector-drop (rem-array-shape arr) 1)
                    (vector-take-right (rem-array-data arr)
@@ -232,7 +230,7 @@
                   (box (array 3))
                   (box (array 6))))))
 
-; Split an array into a list of cells of a given rank
+;;; Split an array into a list of cells of a given rank
 (define (array->cell-list arr cell-rank)
   (define nat-cell-rank
     (if (>= cell-rank 0)
@@ -258,8 +256,8 @@
    (array->cell-list (rem-array #(3 2 4) (for/vector ([i 24]) i)) 2)
    (for/list ([i 3]) (rem-array #(2 4) (for/vector ([j 8]) (+ j (* 8 i)))))))
 
-; Merge a list of cells into an array with the given frame shape
-; If there are no cells in the list (i.e. empty frame), specify a cell shape
+;;; Merge a list of cells into an array with the given frame shape
+;;; If there are no cells in the list (i.e. empty frame), specify a cell shape
 (define/contract (cell-list->array arrs frame-shape [opt-cell-shape #f])
   (->* (list? vector?)
        (vector?)
@@ -320,7 +318,7 @@
    (remora (alit (3 6) 0 1 2 3 20 30 4 5 6 7 40 50 8 9 10 11 60 70))))
 
 
-;; randomly choose items from an array without replacement
+;;; randomly choose items from an array without replacement
 (define R_deal
   (rem-array
    #()
@@ -335,11 +333,11 @@
         (cell-list->array first-cells
                           (rem-array-data count)
                           cell-shape)))))
-;; randomly permute a list
+;;; randomly permute a list
 (remora (def R_shuffle (fn ((xs 'all)) (R_deal (R_tally xs) xs))))
 
-;; Express a number in a given radix sequence
-;; TODO: permit +inf.0 so it can be used in outermost digit
+;;; Express a number in a given radix sequence
+;;; TODO: permit +inf.0 so it can be used in outermost digit
 (define (antibase radix num)
   (define (antibase-internal radix num)
     (cond [(empty? radix) (list num)]
@@ -381,14 +379,14 @@
    (vector
     (Rλ ([op 'all] [init 'all] [xs 'all])
         (define input-items (array->cell-list xs -1))
-        ;(printf "input items: ~s\n" input-items)
+        #;(printf "input items: ~s\n" input-items)
         (define result-items
           (scan (λ (left right)
-                  ;(printf "emitted ~s, next is ~s\n" left right)
+                  #;(printf "emitted ~s, next is ~s\n" left right)
                   (remora-apply op left right))
                 init
                 input-items))
-        ;(printf "result items: ~s\n" result-items)
+        #;(printf "result items: ~s\n" result-items)
         (if (empty? result-items)
             (cell-list->array
              result-items
@@ -411,9 +409,9 @@
                                (array 0 3 7)))))
 
 
-; Interpret a digit list in a given radix
+;;; Interpret a digit list in a given radix
 (define (base radix digits)
-  ; if radix is too short, extend by copying its first element
+  ;; if radix is too short, extend by copying its first element
   (define padded-radix
     (if (> (length digits) (length radix))
         (append (for/list ([c (- (length digits)
@@ -421,7 +419,7 @@
                   (first radix))
                 radix)
         radix))
-  ; if digits is too short, zero-extend it
+  ;; if digits is too short, zero-extend it
   (define padded-digits
     (if (> (length radix) (length digits))
         (append (for/list ([c (- (length radix)
@@ -682,15 +680,15 @@
   (check-equal? (remora ((rerank (0 0) R_equal) (array 0 1 2 3) 1))
                 (remora (array #f #t #f #f))))
 
-;; print a whole array structure (don't just lift and print atoms one-by-one)
-;; TODO: need a version of this that lets caller specify an output port
+;;; print a whole array structure (don't just lift and print atoms one-by-one)
+;;; TODO: need a version of this that lets caller specify an output port
 (define R_show
   (rem-array
    #()
    (vector
     (Rλ ([arr 'all]) (rem-array #() (vector (print arr)))))))
 
-;; read a whole array structure
+;;; read a whole array structure
 (define R_read
   (rem-array
    #()
@@ -698,7 +696,7 @@
     (Rλ ([port 0]) (list->array (read (vector-ref (rem-array-data port) 0)))))))
 
 
-;; right fold a list of Remora arrays using a Remora function array
+;;; right fold a list of Remora arrays using a Remora function array
 (define (rem-foldr op base arrays)
   (cond [(empty? arrays) base]
         [else (remora-apply op
@@ -718,7 +716,7 @@
   (check-equal? (remora (R_foldr (array + -) 0 (array 1 2 3 4)))
                 (remora (array 10 -2))))
 
-;; left fold a list of Remora arrays using a Remora function array
+;;; left fold a list of Remora arrays using a Remora function array
 (define (rem-foldl op base arrays)
   (cond [(empty? arrays) base]
         [else
@@ -741,9 +739,9 @@
                 (remora (array 10 -10))))
 
 
-;; Extract a box's contents
-;; Applying this to an array of boxes risks producing result cells with
-;; mismatching shapes.
+;;; Extract a box's contents
+;;; Applying this to an array of boxes risks producing result cells with
+;;; mismatching shapes.
 (define R_unsafe-unbox
   (rem-array #()
              (vector
@@ -806,8 +804,8 @@
                                                    (array 4 5 6)))
                 (remora (array 1 5 3))))
 
-;; Enable "sliding window" computation over a vector. Subsequences of specified
-;; length are aligned along the major axis for easy folding.
+;;; Enable "sliding window" computation over a vector. Subsequences of specified
+;;; length are aligned along the major axis for easy folding.
 (define R_window
   (rem-array
    #()

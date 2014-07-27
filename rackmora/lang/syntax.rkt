@@ -90,8 +90,8 @@
           (λ (macro-arg)
             macro-defn)))]))
 
-; transform a Remora expression into Racket code
-; remora macros must explicitly recur on the subterms that should be Remora code
+;;; transform a Remora expression into Racket code
+;;; remora macros must explicitly recur on subterms that should be Remora code
 (define-syntax (remora stx)
   (syntax-parse stx
     #:literals (fn alit array apply apply/shape box unbox vec require provide)
@@ -102,13 +102,13 @@
     ;; a bare ATOM in EXP position is converted to a scalar containing that ATOM
     [(_ bare-atom:ATOM)
      (begin
-       ;(displayln "converting bare atom to scalar")
+       #;(displayln "converting bare atom to scalar")
        #'(rem-array (vector) (vector (remora-atom bare-atom))))]
     ;; check whether head is another Remora form (possibly a remora-macro)
     [(_ (head tail ...))
      #:declare head (static remora-macro? "remora macro")
      (begin
-       ;(printf "expanding remora macro ~v\n" (syntax->datum #'head))
+       #;(printf "expanding remora macro ~v\n" (syntax->datum #'head))
        ((remora-macro-transformer (syntax-local-value #'head))
         #'(head tail ...)))]
     ;; if not, this is function application
@@ -120,7 +120,7 @@
     [(_ var:id) #'(racket->remora var)]
     ;; multiple subterms are treated as having an implicit begin
     [(_ subterm ...) #'(begin (remora subterm) ...)]))
-; transform a Remora atom into Racket code
+;;; transform a Remora atom into Racket code
 (define-syntax (remora-atom stx)
   (syntax-parse stx
     #:literals (fn)
@@ -138,27 +138,27 @@
     #'(rem-proc (λ (var ...) (remora body) ...)
                  (list rank ...))]))
 
-; (alit (nat ...) atom ...)
-;  (rem-array (vector nat ...) (vector atom ...))
-; TODO: automated test
+;;; (alit (nat ...) atom ...)
+;;;  (rem-array (vector nat ...) (vector atom ...))
+;;; TODO: automated test
 (define-remora-syntax (alit stx)
   (syntax-parse stx
     [(_ (dim:nat ...) elt:ATOM ...)
      #'(rem-array (vector dim ...)
                   (vector (remora-atom elt) ...))]))
 
-; (apply expr1 expr2 ...)
-;  (apply-rem-array expr expr ...)
-; TODO: automated test
+;;; (apply expr1 expr2 ...)
+;;;  (apply-rem-array expr expr ...)
+;;; TODO: automated test
 (define-remora-syntax (apply stx)
   (syntax-parse stx
     [(_ fun arg ...)
      #'(remora-apply (remora fun)
                      (remora arg) ...)]))
 
-; (apply/shape expr0 expr1 expr2 ...)
-;  (apply-rem-array (rem-array->vector expr0) expr expr ...)
-; TODO: automated test
+;;; (apply/shape expr0 expr1 expr2 ...)
+;;;  (apply-rem-array (rem-array->vector expr0) expr expr ...)
+;;; TODO: automated test
 (define-remora-syntax (apply/shape stx)
   (syntax-parse stx
     [(_ shp fun arg ...)
@@ -171,38 +171,38 @@
      #'(remora-apply (remora fun)
                      #:result-shape (rem-array->vector (remora shp))
                      (remora arg) ...)]))
-; or should the shape only get evaluated if it turns out to be needed?
-; if it's a by-need thing, will need to make it a thunk and have apply-rem-array
-; force it whenn needed
+;;; or should the shape only get evaluated if it turns out to be needed?
+;;; if it's by-need, will need to make it a thunk and have apply-rem-array
+;;; force it whenn needed
 
-; (box expr)
-;  (rem-box expr)
-; TODO: automated test
+;;; (box expr)
+;;;  (rem-box expr)
+;;; TODO: automated test
 (define-remora-syntax (box stx)
   (syntax-parse stx
     [(_ contents) #'(rem-box (remora contents))]))
 
-; (unbox var some-box expr)
-;  (let ([var (rem-box-contents some-box)]) expr)
-; TODO: automated test
+;;; (unbox var some-box expr)
+;;;  (let ([var (rem-box-contents some-box)]) expr)
+;;; TODO: automated test
 (define-remora-syntax (unbox stx)
   (syntax-parse stx
     [(_ var:id some-box body)
      #'(let ([var (rem-box-contents (remora some-box))]) (remora body))]))
 
-; (vec expr ...)
-;  (build-vec expr ...)
-; TODO: automated test
+;;; (vec expr ...)
+;;;  (build-vec expr ...)
+;;; TODO: automated test
 (define-remora-syntax (vec stx)
   (syntax-parse stx
     [(_ piece ...) #'(build-vec (remora piece) ...)]))
 
-; (array . array-literals)
-; "smart constructor"
-; if all exps are (alit ...) with same shape, gather them into one alit form
-; disallow (alit ...)s with mismatching forms
-; otherwise, (apply build-array exps)
-; TODO: automated test
+;;; (array . array-literals)
+;;; "smart constructor"
+;;; if all exps are (alit ...) with same shape, gather them into one alit form
+;;; disallow (alit ...)s with mismatching forms
+;;; otherwise, (apply build-array exps)
+;;; TODO: automated test
 (define-remora-syntax (array stx)
   (syntax-parse stx
     #:literals (alit)
@@ -231,7 +231,7 @@
           [else (and (equal? (first xs) (second xs))
                      (all-equal? (rest xs)))])))
 
-; (def name defn-or-expr ... expr)
+;;; (def name defn-or-expr ... expr)
 (define-remora-syntax (def stx)
   (syntax-parse stx
     [(_ name defn-or-expr )
@@ -247,9 +247,9 @@
     [(_ subterm ...) #'(provide subterm ...)]))
 
 
-; sugar for reranking by eta-expansion
-; operates on function arrays (as names only stand for arrays, not functions),
-; but constructs a scalar
+;;; sugar for reranking by eta-expansion
+;;; operates on function arrays (as names only stand for arrays, not functions),
+;;; but constructs a scalar
 (define-remora-syntax (rerank stx)
   (syntax-parse stx
     [(_ (new-rank:RANK ...) original-function)

@@ -10,24 +10,24 @@ rackmora/lang/language
          remora-read
          remora-read-syntax)
 
-; #A(NAT ...)(ATOM ...)
-;  reads as
-; (alit (NAT ...) ATOM ...)
+;;; #A(NAT ...)(ATOM ...)
+;;;  reads as
+;;; (alit (NAT ...) ATOM ...)
 (define (read-alit trigger-char
                    port
                    source-name
                    line-num
                    col-num
                    position)
-  ; take text from the port, looking for (NAT ...)(ATOM ...)
+  ;; take text from the port, looking for (NAT ...)(ATOM ...)
   (define shape (read port))
   (define atoms (read port))
   (cons 'alit
         (cons shape atoms)))
 
-; [ALITERAL ...]
-;  reads as
-; (array ALITERAL ...)
+;;; [ALITERAL ...]
+;;;  reads as
+;;; (array ALITERAL ...)
 (define (read-array trigger-char
                     port
                     source-name
@@ -49,9 +49,9 @@ rackmora/lang/language
       (set! pieces (cons next pieces)))
     pieces))
 
-; #r(RANK ...)EXP
-;  reads as
-; (rerank (RANK ...) EXP)
+;;; #r(RANK ...)EXP
+;;;  reads as
+;;; (rerank (RANK ...) EXP)
 (define (read-rerank trigger-char
                      port
                      source-name
@@ -62,7 +62,6 @@ rackmora/lang/language
   (define base-exp (read port))
   (list 'rerank new-ranks base-exp))
 
-;(require racket/list)
 (define (extend-readtable base-readtable . new-entries)
   (cond [(empty? new-entries) base-readtable]
         [else

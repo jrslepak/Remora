@@ -1,7 +1,5 @@
 #lang racket/base
 
-; TODO: change how write/print/display work for rem-array
-
 (require racket/list
          racket/vector
          racket/sequence
@@ -15,7 +13,7 @@
 ;;; Internal use structures:
 ;;;-------------------------------------
 
-;; Apply a Remora array (in Remora, an array may appear in function position)
+;;; Apply a Remora array (in Remora, an array may appear in function position)
 (provide
  (contract-out
   (apply-rem-array (->* (rem-array?)
@@ -28,18 +26,18 @@
 (define (apply-rem-array fun
                          #:result-shape [result-shape 'no-annotation]
                          . args)
-  ; check whether the data portion of fun is Remora procedures
+  ;; check whether the data portion of fun is Remora procedures
   (unless (for/and [(p (rem-array-data fun))] (rem-proc? p))
     (error "Array in function position must contain only Remora functions" fun))
   
   (when (debug-mode) (printf "\n\nResult shape is ~v\n" result-shape))
   
-  ; check whether args actually are Remora arrays
+  ;; check whether args actually are Remora arrays
   (unless (for/and [(arr args)] (or (rem-array? arr) (rem-box? arr)))
     (error "Remora arrays can only by applied to Remora arrays" fun args))
   (when (debug-mode) (printf "checked for Remora array arguments\n"))
   
-  ; identify expected argument cell ranks
+  ;; identify expected argument cell ranks
   (define individual-exp-ranks
     (for/list [(p (rem-array-data fun))]
       (when (debug-mode) (printf "checking expected ranks for ~v\n" p))
@@ -60,7 +58,7 @@
           [else (error "Could not identify expected rank for function" fun)]))
   (when (debug-mode) (printf "expected-rank = ~v\n" expected-rank))
   
-  ; find principal frame shape
+  ;; find principal frame shape
   (define principal-frame
     (or (for/fold ([max-frame (rem-array-shape fun)])
           ([arr args]
@@ -75,21 +73,21 @@
                        (vector-drop-right (rem-value-shape arr) r))))))
   (when (debug-mode) (printf "principal-frame = ~v\n" principal-frame))
   
-  ; compute argument cell sizes
+  ;; compute argument cell sizes
   (define cell-sizes
     (for/list ([arr args]
                [r expected-rank])
       (sequence-fold * 1 (vector-take-right (rem-value-shape arr) r))))
   (when (debug-mode) (printf "cell-sizes = ~v\n" cell-sizes))
   
-  ; compute argument frame sizes
+  ;; compute argument frame sizes
   (define frame-sizes
     (for/list ([arr args]
                [r expected-rank])
       (sequence-fold * 1 (vector-drop-right (rem-value-shape arr) r))))
   (when (debug-mode) (printf "frame-sizes = ~v\n" frame-sizes))
   
-  ; compute each result cell
+  ;; compute each result cell
   (define result-cells
     (for/vector ([cell-id (sequence-fold * 1 principal-frame)])
       (define function-cell-id
@@ -116,12 +114,12 @@
                     cell-id csize (sequence-fold * 1 principal-frame) fsize))
           (define arg-cell
             (cond
-              ; if the argument is itself a box, it is its own sole cell
+              ;; if the argument is itself a box, it is its own sole cell
               [(rem-box? arr)
                (when (debug-mode) (printf " (argument is a box)"))
                arr]
-              ; if we are taking a single box from an array of boxes,
-              ; the cell is the box, not a scalar wrapper around the box
+              ;; if we are taking a single box from an array of boxes,
+              ;; the cell is the box, not a scalar wrapper around the box
               [(and (equal? csize 1)
                     (rem-box? (vector-ref (rem-value-data arr) offset)))
                (when (debug-mode) (printf " (cell is a box)"))
@@ -149,17 +147,17 @@
   (when (debug-mode)
     (printf "# of result cells: ~v\nresult-shape = ~v\n"
             (vector-length result-cells) result-shape))
-  ; determine final result shape
+  ;; determine final result shape
   (define final-shape
     (cond
-      ; empty frame and no shape annotation -> error
+      ;; empty frame and no shape annotation -> error
       [(and (equal? result-shape 'no-annotation)
             (equal? 0 (vector-length result-cells)))
        (error "Empty frame with no shape annotation: ~v applied to ~v"
               fun args)]
-      ; empty frame -> use annotated shape
-      ; TODO: should maybe check for mismatch between annotated and actual
-      ;       (i.e. frame-shape ++ cell-shape) result shapes
+      ;; empty frame -> use annotated shape
+      ;; TODO: should maybe check for mismatch between annotated and actual
+      ;;       (i.e. frame-shape ++ cell-shape) result shapes
       [(equal? 0 (vector-length result-cells)) result-shape]
       [(for/and ([c result-cells])
          (equal? (rem-value-shape (vector-ref result-cells 0))
@@ -172,7 +170,7 @@
       [else (error "Result cells have mismatched shapes: ~v" result-cells)]))
   (when (debug-mode) (printf "final-shape = ~v\n" final-shape))
   
-  ; determine final result data: all result cells' data vectors concatenated
+  ;; determine final result data: all result cells' data vectors concatenated
   (define final-data
     (if (and (> (vector-length result-cells) 0)
              (rem-box? (vector-ref result-cells 0)))
@@ -194,21 +192,21 @@
              (vector-ref final-data 0))
       (rem-array final-shape final-data)))
 
-;; Contract constructor for vectors of specified length
+;;; Contract constructor for vectors of specified length
 (define ((vector-length/c elts len) vec)
   (and ((vectorof elts #:flat? #t) vec)
        (equal? (vector-length vec) len)))
 
-;; String representation of an array, for print, write, or display mode
+;;; String representation of an array, for print, write, or display mode
 (define (array->string arr [mode 0])
   (define format-string
     (cond [(member mode '(0 1)) "~v"] ; print
           [(equal? mode #t) "~s"]     ; write
           [(equal? mode #f) "~a"]))   ; display
   (if (equal? mode #t)
-      ; write mode
+      ;; write mode
       (format "(rem-array ~s ~s)" (rem-array-shape arr) (rem-array-data arr))
-      ; print/display mode
+      ;; print/display mode
       (cond [(and (not (= 0 (vector-length (rem-array-data arr))))
                   (for/and ([e (rem-array-data arr)]) (void? e)))
              ""]
@@ -222,13 +220,13 @@
                                     (if (equal? 0 cell-id) "" " ")
                                     (array->string cell mode)))
                    "]")])))
-;; Print, write, or display an array
+;;; Print, write, or display an array
 (define (show-array arr [port (current-output-port)] [mode 0])
   (display (array->string arr mode) port))
 
-;; A Remora array has
-;; - shape, a vector of numbers
-;; - data, a vector of any
+;;; A Remora array has
+;;; - shape, a vector of numbers
+;;; - data, a vector of any
 (provide
  (contract-out
   #;(struct rem-array
@@ -255,7 +253,7 @@
   (define array-ex:vector1 (rem-array #(2) #(10 20)))
   (define array-ex:matrix1 (rem-array #(2 3) #(1 2 3 4 5 6))))
 
-;; Find the rank of a Remora array
+;;; Find the rank of a Remora array
 (provide
  (contract-out
   (rem-array-rank (-> rem-array? exact-nonnegative-integer?))))
@@ -265,7 +263,7 @@
   (check-equal? 1 (rem-array-rank array-ex:vector1))
   (check-equal? 2 (rem-array-rank array-ex:matrix1)))
 
-;; Convert a Remora vector (rank 1 Remora array) to a Racket vector
+;;; Convert a Remora vector (rank 1 Remora array) to a Racket vector
 (provide
  (contract-out (rem-array->vector
                 (-> (λ (arr) (and (rem-array? arr)
@@ -277,31 +275,31 @@
       (error rem-array->vector "provided array does not have rank 1")))
 
 
-;; Apply a Remora procedure (for internal convenience)
-;; TODO: consider eliminating this (see note in rem-proc struct defn)
+;;; Apply a Remora procedure (for internal convenience)
+;;; TODO: consider eliminating this (see note in rem-proc struct defn)
 (define (apply-rem-proc fun . args)
   (apply (rem-proc-body fun) args))
 
-;; A valid expected rank is either a natural number or 'all
+;;; A valid expected rank is either a natural number or 'all
 (define (rank? r)
   (or (exact-nonnegative-integer? r) (equal? 'all r)))
 
-;; Print, write, or display a Remora procedure
+;;; Print, write, or display a Remora procedure
 (define (show-rem-proc proc [port (current-output-port)] [mode 0])
   (display "#<rem-proc>" port))
 
-;; A Remora procedure has
-;; - body, a Racket procedure which consumes and produces Remora arrays
-;; - ranks, a list of the procedure's expected argument ranks
-;; TODO: tighten the contract on body to require the procedure to consume and
-;; produce arrays
+;;; A Remora procedure has
+;;; - body, a Racket procedure which consumes and produces Remora arrays
+;;; - ranks, a list of the procedure's expected argument ranks
+;;; TODO: tighten the contract on body to require the procedure to consume and
+;;; produce arrays
 (provide
  (contract-out (struct rem-proc ([body procedure?]
                                  [ranks (listof rank?)]))))
 (define-struct rem-proc (body ranks)
   #:transparent
-  ; may decide to drop this part -- it seems to hide a common error:
-  ;   using (R+ arr1 arr2) instead of ([scalar R+] arr1 arr2) means no lifting
+  ;; may decide to drop this part -- it seems to hide a common error:
+  ;;   using (R+ arr1 arr2) instead of ([scalar R+] arr1 arr2) means no lifting
   #:property prop:procedure apply-rem-proc
   #:methods gen:custom-write [(define write-proc show-rem-proc)])
 (module+ test
@@ -312,7 +310,7 @@
                 (rem-array #() #(6))))
 
 
-;; Construct an array as a vector of -1-cells
+;;; Construct an array as a vector of -1-cells
 (provide
  (contract-out (build-vec (->* ()
                                #:rest (listof (or/c rem-array? rem-box?))
@@ -344,36 +342,36 @@
 
 
 
-;; A Remora box (dependent sum) has
-;; - contents, a Remora value
-;; - indices, a list of the witness indices
+;;; A Remora box (dependent sum) has
+;;; - contents, a Remora value
+;;; - indices, a list of the witness indices
 (provide (contract-out
           (struct rem-box ([contents rem-array?]))))
 (define-struct rem-box (contents)
   #:transparent)
 
 ;;; More permissive variants of rem-array functions
-;; Find the shape of a Remora value (array or box)
-;; Boxes are considered to have scalar shape
+;;; Find the shape of a Remora value (array or box)
+;;; Boxes are considered to have scalar shape
 (define (rem-value-shape v)
   (cond [(rem-array? v) (rem-array-shape v)]
         [(rem-box? v) #()]))
-;; Find the rank of a Remora value (array or box)
-;; Boxes are considered to have scalar rank
+;;; Find the rank of a Remora value (array or box)
+;;; Boxes are considered to have scalar rank
 (define (rem-value-rank v)
   (cond [(rem-array? v) (rem-array-rank v)]
         [(rem-box? v) 0]))
-;; Find the data contents of a Remora value (array or box)
-;; Boxes are considered to be their own contents
+;;; Find the data contents of a Remora value (array or box)
+;;; Boxes are considered to be their own contents
 (define (rem-value-data v)
   (cond [(rem-array? v) (rem-array-data v)]
         [(rem-box? v) v]))
-;; Determine whether a value is a Remora value
+;;; Determine whether a value is a Remora value
 (define (rem-value? v) (or (rem-array? v) (rem-box? v)))
 
 
-;; Identify which of two sequences is the prefix of the other, or return #f
-;; if neither is a prefix of the other (or if either sequence is #f)
+;;; Identify which of two sequences is the prefix of the other, or return #f
+;;; if neither is a prefix of the other (or if either sequence is #f)
 (define (prefix-max seq1 seq2)
   (and seq1 seq2
        (for/and ([a seq1] [b seq2])
@@ -388,7 +386,7 @@
   (check-equal? (prefix-max #(3 2) #(3 4 5)) #f))
 
 
-;; Extract a contiguous piece of a vector
+;;; Extract a contiguous piece of a vector
 (provide
  (contract-out (subvector (-> (vectorof any/c)
                               exact-nonnegative-integer?
@@ -403,7 +401,7 @@
   (check-equal? (subvector #(2 4 6 3 5 7) 4 0) #()))
 
 
-;; Convert a rank-1 or higher array to a list of its -1-cells
+;;; Convert a rank-1 or higher array to a list of its -1-cells
 (define (-1-cells arr)
   (define cell-shape (vector-drop (rem-array-shape arr) 1))
   (define cell-size (for/product ([dim cell-shape]) dim))
@@ -416,8 +414,8 @@
 
 
 
-;; tests for array application
-;; TODO: test array application for functions that consume/produce non-scalars
+;;; tests for array application
+;;; TODO: test array application for functions that consume/produce non-scalars
 (module+ test
   (check-equal? ((scalar R+) (scalar 3) (scalar 4))
                 (scalar 7))
@@ -432,7 +430,7 @@
 ;;;-------------------------------------
 ;;; Integration utilities
 ;;;-------------------------------------
-;; Build a scalar Remora procedure from a Racket procedure
+;;; Build a scalar Remora procedure from a Racket procedure
 (provide
  (contract-out
   (rem-scalar-proc (-> procedure? exact-nonnegative-integer? rem-proc?))))
@@ -445,10 +443,10 @@
                            (vector-ref (rem-array-data a) 0))))))
             (for/list [(i arity)] 0)))
 
-;; Build a scalar Remora array from a Racket value
+;;; Build a scalar Remora array from a Racket value
 (define (scalar v) (rem-array #() (vector-immutable v)))
 
-;; Extract a racket value from a scalar Remora array
+;;; Extract a racket value from a scalar Remora array
 (provide
  (contract-out
   (scalar->atom (-> (λ (arr) (and (rem-array? arr)
@@ -456,7 +454,7 @@
                     any/c))))
 (define (scalar->atom a) (vector-ref (rem-array-data a) 0))
 
-;; Build a Remora array from a nested Racket list
+;;; Build a Remora array from a nested Racket list
 (provide
  (contract-out
   (list->array (-> regular-list? rem-array?))))
@@ -465,7 +463,7 @@
         [(list? (first xs))
          (apply build-vec (for/list ([x xs]) (list->array x)))]
         [else (apply build-vec (for/list ([x xs]) (scalar x)))]))
-;; Check whether a nested list is regular (non-ragged)
+;;; Check whether a nested list is regular (non-ragged)
 (define (regular-list? xs)
   (and (list? xs)
        (cond [(empty? xs) #t]
@@ -482,8 +480,8 @@
   (check-true (regular-list? '(((a b c)(a b c))((a b c)(a b c)))))
   (check-false (regular-list? '(((a b c)(a b))((a b c)(a b c))))))
 
-;; Apply what may be a Remora array or a Racket procedure to some Remora arrays,
-;; with a possible result shape annotation
+;;; Apply what may be a Remora array or Racket procedure to some Remora arrays,
+;;; with a possible result shape annotation
 (provide (contract-out
           (remora-apply (->* (procedure?)
                              (#:result-shape
@@ -513,8 +511,8 @@
                 #:result-shape result-shape
                 args)]))
 
-;; if given array contains Racket procedures, convert them to Remora procedures
-;; of the given arity
+;;; if given array contains Racket procedures, convert them to Remora procedures
+;;; of the given arity
 (define (racket-proc-array->rem-proc-array arr arity)
   (rem-array (rem-array-shape arr)
              (for/vector ([elt (rem-array-data arr)])
