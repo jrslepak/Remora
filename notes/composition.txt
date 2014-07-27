@@ -1,0 +1,124 @@
+These need to be syntax rather than actual operators because of variable arity.
+
+
+
+Fork:
+((-< ⊕ f g h) x y)
+
+      ⊕
+    / | \
+   /  |  \
+  f   g   h
+
+(⊕ (f x y) (g x y) (h x y))
+
+Tines can have any arity, as long as all tines have the same arity.
+Resulting function has that arity.
+
+In typed Remora, all tines must have same input type.
+Joining function must take arguments of same type as tines' output.
+
+(f : t1 ... -> t2) ...
+⊕ : t2 ... -> t3
+----------------
+(-< ⊕ f ...+) : t1 ... -> t3
+
+(using  t1 ... t2 -> t3  as shorthand for  t1 ... -> t2 -> t3  -- expand recursively)
+
+This carries the expected ranks of the tines through to become the expected ranks of the resulting function, so we should probably do the same in dynamic Remora.
+
+
+
+
+Fanout compose:
+((&< ⊕ f g h) x y z)
+
+      ⊕
+    / | \
+   /  |  \
+  f   g   h
+  |   |   |
+  |   |   |
+  x   y   z
+
+(⊕ (f x) (g y) (h z))
+
+Tines must be unary.
+Resulting function's arity is joining function's arity.
+
+(f : t1 -> t2) ...
+⊕ : (t2 ... -> t3)
+----------------
+(&< ⊕ f ...+) : t1 ... -> t3
+
+
+
+
+Compose:
+((& ⊕ f g) x y)
+
+      ⊕
+    /   \
+   f     f
+   |     |
+   g     g
+   |     |
+   x     y
+
+(⊕ (f (g x)) (f (g y)))
+
+Each chain link must be unary.
+Resulting function's arity is joining function's arity.
+In typed Remora, n-ary chained compose is probably too tricky to type (even Typed Racket doesn't allow it).
+
+f : t1 -> t2
+⊕ : t2 ... -> t3
+----------------
+(& ⊕ f) : t1 ... -> t3
+
+Alternatively, & could be a family of operators with types
+&_1 : ∀t1,t2,t3 . (t2 -> t3) -> (t1 -> t2) -> (t1 -> t3)
+&_2 : ∀t1,t2,t3 . (t2 -> t2 -> t3) -> (t1 -> t2) -> (t1 -> t1 -> t3)
+&_3 : ∀t1,t2,t3 . (t2 -> t2 -> t2 -> t3) -> (t1 -> t2) -> (t1 -> t1 -> t1 -> t3)
+etc.
+
+
+
+At: (or "chain"?)
+((@ f g ⊕) x y z)
+
+    f
+    |
+    g
+    |
+    ⊕
+   /|\
+  / | \
+ x  y  z
+
+(f (g (⊕ x y z)))
+Bottom of chain (joining function) can have any arity. Other links are unary.
+Again, n-ary chained compose is hard to type.
+
+⊕ : t1 ... -> t2
+f : t2 -> t3
+----------------
+(@ f ⊕) : t1 ... -> t3
+
+@ could also be a family of operators like &, typed as
+@_1 : ∀t1,t2,t3 . (t2 -> t3) -> (t1 -> t2) -> (t1 -> t3)
+@_2 : ∀t1,t2,t3 . (t2 -> t3) -> (t1 -> t1 -> t2) -> (t1 -> t1 -> t3)
+@_3 : ∀t1,t2,t3 . (t2 -> t3) -> (t1 -> t1 -> t1 -> t2) -> (t1 -> t1 -> t1 -> t3)
+
+
+
+& and @ might be workable as sugar that expands to a chain of binary composition calls:
+(@ sqrt add1 +) -> (@_1 sqrt (@_2 add1 +))
+
+
+All of these should be able to lift using prefix agreement like an actual function application.
+
+
+Supporting these composition forms is going to require changing how procedures imported from Racket are handled: instead of late-binding their arity, make the programmer specify their arity at import (maybe allow the smallest legal arity for the imported procedure as a default). I don't currently know the best way to do this is a new require-spec or a form like
+  (import/lift <module-path> (name arity) ...)
+
