@@ -151,7 +151,7 @@ a @racket[1] added to the beginning. This result is equivalent to
 @code[#:lang "rackmora"]{[x]}.
 }
 
-@defproc[(tally [x 'all]) 0]{
+@defproc[(length [x 'all]) 0]{
 Extract the first element of @code[#:lang "rackmora"]{x}'s shape, the length
 along its major axis.
 }

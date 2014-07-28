@@ -334,7 +334,7 @@
                           (rem-array-data count)
                           cell-shape)))))
 ;;; randomly permute a list
-(remora (def R_shuffle (fn ((xs all)) (R_deal (R_tally xs) xs))))
+(remora (def R_shuffle (fn ((xs all)) (R_deal (R_length xs) xs))))
 
 ;;; Express a number in a given radix sequence
 ;;; TODO: permit +inf.0 so it can be used in outermost digit
@@ -652,16 +652,16 @@
                 (remora (array (array (array 1 2)
                                       (array 3 4))))))
 
-(define R_tally
+(define R_length
   (rem-array
    #()
    (vector
     (Rλ ([arr 'all])
         (rem-array #() (vector (vector-ref (rem-array-shape arr) 0)))))))
 (module+ test
-  (check-equal? (remora (R_tally (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
+  (check-equal? (remora (R_length (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
                 (remora 4))
-  (check-equal? (remora ((rerank (1) R_tally)
+  (check-equal? (remora ((rerank (1) R_length)
                          (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
                 (remora (array 3 3 3 3))))
 

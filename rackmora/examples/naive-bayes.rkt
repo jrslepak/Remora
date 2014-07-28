@@ -26,7 +26,7 @@
 
 (def feature-means
   (fl/ (exact->inexact (foldr + 0 (#r(1)curtail train-set)))
-       (exact->inexact (tally train-set))))
+       (exact->inexact (length train-set))))
 
 
 ;;; Split the training set into spam and legit messages
@@ -56,12 +56,12 @@
 
 ;;; Smoothed conditional probabilities for each feature
 (def prob-spam-low (fl/ (exact->inexact (+ 1 spam-below-mean))
-                        (exact->inexact (+ 2 (tally train-spam)))))
+                        (exact->inexact (+ 2 (length train-spam)))))
 (def prob-legit-low (fl/ (exact->inexact (+ 1 legit-below-mean))
-                         (exact->inexact (+ 2 (tally train-legit)))))
-(def net-prob (fl/ (exact->inexact (+ 1 (tally train-spam)))
-                   (exact->inexact (+ 2 (+ (tally train-spam)
-                                           (tally train-legit))))))
+                         (exact->inexact (+ 2 (length train-legit)))))
+(def net-prob (fl/ (exact->inexact (+ 1 (length train-spam)))
+                   (exact->inexact (+ 2 (+ (length train-spam)
+                                           (length train-legit))))))
 
 
 ;;; Test phase
@@ -133,7 +133,7 @@
 
 (printf "correctly classified ~v of ~v test messages\n"
         (foldr + 0 (select results 1 0))
-        (tally results))
+        (length results))
 (printf "\taccuracy ~v\n"
         (exact->inexact
-         (/ (foldr + 0 (select results 1 0)) (tally results))))
+         (/ (foldr + 0 (select results 1 0)) (length results))))

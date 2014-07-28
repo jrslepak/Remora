@@ -5,10 +5,11 @@
 #;(provide (except-out all-defined-out mean))
 
 ;;; Mean
-;;; CR shivers: tally -> length
+;;; XCR shivers: tally -> length
+;;; jrslepak: renamed operator
 (def mean
   (fn ((samples 1)) (/ (foldr + 0 samples)
-                       (tally samples))))
+                       (length samples))))
 
 
 ;;; XCR shivers: Indent lambda body (and other "bodies", e.g. let) 2 cols.
@@ -90,6 +91,6 @@
       ;; magnitude must be scaled down by half the buffer length
       ;; result phase is how far from 0 (i.e., 2π) the buffer's last sample is
       (/ (goertzel-fir freq (goertzel-iir freq signal))
-         (/ (tally signal) 2))))
+         (/ (length signal) 2))))
 
 
