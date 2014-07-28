@@ -12,7 +12,7 @@ basic unit the function operates on, and the function implicitly lifts to
 operate on arguments of higher rank. For example, @racket[+] expects rank 0
 arguments, and @racket[antibase] expects its first argument to be a rank 1 array
 of digits. The operators are implicitly lifted to higher-rank arguments. Some
-functions expect rank @racket['all] for certain arguments. This means the
+functions expect rank @racket[all] for certain arguments. This means the
 function is never lifted over that argument---it consumes any argument as its
 basic unit, no matter the rank.
 

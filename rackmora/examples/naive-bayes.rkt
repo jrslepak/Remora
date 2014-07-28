@@ -76,7 +76,7 @@
 
 ;;; Decide how confident we are in a message's spam/legit status
 (def classify
-  (fn ((message 'all))
+  (fn ((message all))
     ;; probability of this feature set given that this message is spam
     (def features-given-spam
       (#r(0 0 1)foldr

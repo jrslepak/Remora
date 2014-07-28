@@ -13,6 +13,7 @@
 (provide Rλ
          remora
          fn
+         all
          alit
          array
          apply/shape
@@ -37,11 +38,13 @@
     (pattern (quote sexp)))
   (define-syntax-class RANK
     #:description "Remora argument rank"
-    (pattern 'all)
+    #:literals (all)
+    #;(pattern 'all)
+    (pattern all)
     (pattern cell-rank:nat))
   (define-syntax-class ATOM
     #:description "Remora atom"
-    #:literals (fn)
+    #:literals (fn all)
     (pattern const:CONST)
     (pattern (fn ((var:id r:RANK) ...) body ...)))
   (define-syntax-class ALITERAL
@@ -134,9 +137,18 @@
 
 (define-remora-syntax (fn stx)
   (syntax-parse stx
-    [(_ ((var:id rank:expr) ...) body ...+)
+    [(_ ((var:id rank:RANK) ...) body ...+)
     #'(rem-proc (λ (var ...) (remora body) ...)
-                 (list rank ...))]))
+                 (list #;rank (syntax->rank-value rank) ...))]))
+;;; Need to provide some definition for `all` in order to use it as a literal
+(define-syntax all
+  (syntax-id-rules ()
+    [_ 'all]))
+;;; Transform surface syntax for a rank into the behind-the-scenes value.
+(define-syntax (syntax->rank-value stx)
+  (syntax-parse stx
+    [(_ finite-rank:nat) #'finite-rank]
+    [(_ all) (syntax 'all)]))
 
 ;;; (alit (nat ...) atom ...)
 ;;;  (rem-array (vector nat ...) (vector atom ...))
