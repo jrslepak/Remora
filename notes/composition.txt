@@ -122,3 +122,13 @@ All of these should be able to lift using prefix agreement like an actual functi
 Supporting these composition forms is going to require changing how procedures imported from Racket are handled: instead of late-binding their arity, make the programmer specify their arity at import (maybe allow the smallest legal arity for the imported procedure as a default). I don't currently know the best way to do this is a new require-spec or a form like
   (import/lift <module-path> (name arity) ...)
 
+
+Combining currying and a focus on pointfree programming makes it hard to talk about the arity of a function. Is filter a binary function that keeps list elements that match a predicate, or is it a unary function that produces a list processor? So we don't really know what arity the programmer intends a curried function to have.
+
+We have to make a decision based on (unknown) arity at the bottom of a -< or @ form -- we need to know whether the tines are meant to produce functions or first order data. We might be able to narrow this down by looking up one level.
+
+In (-< ⊕ f ...), find the argument types of ⊕. In (@ f ⊕), find the argument type of f. Take as much of (the right side of) each tine's type as it takes to unify with the argument type(s).
+
+We also have to know the arity of ⊕ in (& ⊕ f).
+
+(& ⊕ f ...) fixes some arity for ⊕ and requires all f ... to be unary.
