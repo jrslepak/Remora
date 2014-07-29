@@ -1,7 +1,5 @@
 #lang racket/base
 
-; TODO: add define form, modify fn to allow local define
-
 (require "semantics.rkt"
          syntax/parse
          (for-syntax syntax/parse
@@ -35,6 +33,7 @@
     (pattern bool:boolean)
     (pattern numlit:number)
     (pattern strlit:str)
+    (pattern charlit:char)
     (pattern (quote sexp)))
   (define-syntax-class RANK
     #:description "Remora argument rank"

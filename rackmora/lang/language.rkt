@@ -3,7 +3,8 @@
 (require racket/provide
          racket/require
          "syntax.rkt"
-         "semantics.rkt"
+         (except-in "semantics.rkt"
+                    list->array)
          ;"basis-lib.rkt"
          (for-syntax racket/base
                      syntax/parse)

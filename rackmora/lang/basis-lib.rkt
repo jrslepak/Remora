@@ -826,3 +826,47 @@
                                [array [array 6 7 8 9 10]
                                       [array 7 8 9 10 6]
                                       [array 8 9 10 6 7]]])))
+
+
+
+;;; Convert a Racket nested list into a Remora array
+(define R_list->array
+  (rem-array
+   #()
+   (vector
+    (Rλ ([lst 0])
+        (list->array (scalar->atom lst))))))
+
+;;; Convert a Remora array to a nested Racket list containing its atoms
+(define R_array->list
+  (rem-array
+   #()
+   (vector
+    (Rλ ([arr 'all])
+        #;(printf "got array ~s\n" arr)
+        #;(printf "producing list ~s\n" (array->nest arr))
+        (rem-array #() (vector (array->nest arr)))))))
+(module+ test
+  (check-equal? (remora (R_array->list 4))
+                (remora 4))
+  (check-equal? (remora (R_array->list (array 1 2 3 4 5 6)))
+                (remora '(1 2 3 4 5 6)))
+  (check-equal? (remora (R_array->list (array (array 1 2 3 4 5 6))))
+                (remora '((1 2 3 4 5 6))))
+  (check-equal? (remora (R_array->list (array (array 1 2 3 4 5 6))))
+                (remora '((1 2 3 4 5 6))))
+  (check-equal? (remora (R_array->list (array (array 1 2 3)
+                                              (array 4 5 6))))
+                (remora '((1 2 3) (4 5 6))))
+  (check-equal? (remora (R_array->list (array (array 1 2)
+                                              (array 3 4)
+                                              (array 5 6))))
+                (remora '((1 2) (3 4) (5 6)))))
+
+;;; Convert a Racket string to a Remora vector containing its characters
+(remora (def R_string->array
+          (fn ((str 0)) (R_list->array (string->list str)))))
+
+;;; Construct a Racket string from a Remora vector of characters
+(remora (def R_array->string
+          (fn ((arr 1)) (list->string (R_array->list arr)))))
