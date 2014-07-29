@@ -22,14 +22,14 @@
 ;;; Variance
 (def variance
   (fn ((samples 1))
-      (mean (sqr (- samples (mean samples))))))
+    (mean (sqr (- samples (mean samples))))))
 
 
 ;;; Covariance
 (def covariance
   (fn ((xs 1) (ys 1))
-      (mean (* (- xs (mean xs))
-               (- ys (mean ys))))))
+    (mean (* (- xs (mean xs))
+             (- ys (mean ys))))))
 
 
 ;;; Autocovariance -- covariance of a signal and a delayed version of itself
@@ -37,15 +37,20 @@
 ;;; from the beginning of the signal
 (def autocovariance
   (fn ((samples 1) (delay 0))
-      (covariance samples (rotate samples delay))))
+    (covariance samples (rotate samples delay))))
 
 
 ;;; Pearson correlation
+(def correlation
+  (fn ((xs 1) (ys 1))
+    (/ (covariance xs ys)
+       (* (sqrt (variance xs)) (sqrt (variance ys))))))
 
 
 ;;; Autocorrelation
-#;(def autocorrelation
-    (fn ((signal 1) (delay 0)) ___))
+(def autocorrelation
+  (fn ((signal 1) (delay 0))
+    (correlation signal (rotate signal delay))))
 
 
 ;;; Convolution
@@ -60,9 +65,9 @@
 ;;; Generate a sinusoid with given (digital) frequency and phase
 (def sinusoid
   (fn ((length 0) (freq 0) (phase 0))
-      (unbox count (iota [length])
-             (cos (+ (* count freq 2 pi)
-                     phase)))))
+    (unbox count (iota [length])
+      (cos (+ (* count freq 2 pi)
+              phase)))))
 
 
 ;;; Goertzel algorithm (extract single frequency component)
@@ -72,25 +77,25 @@
 ;;; accumulator is actually needed.
 (def goertzel-iir-step
   (fn ((freq 0))
-      (fn ((next 0) (accum 1))
-          (array (- (+ next (* 2 (cos (* 2 pi freq)) (head accum)))
-                    (tail accum))
-                 (head accum)))))
+    (fn ((next 0) (accum 1))
+      (array (- (+ next (* 2 (cos (* 2 pi freq)) (head accum)))
+                (tail accum))
+             (head accum)))))
 (def goertzel-iir
   (fn ((freq 0) (signal 1))
-      (#r(1)head (scan (goertzel-iir-step freq) (array 0 0) signal))))
+    (#r(1)head (scan (goertzel-iir-step freq) (array 0 0) signal))))
 (def goertzel-fir-step
   (fn ((freq 0) (win 1)) ; length-2 window of post-IIR signal
-      (- (tail win)
-         (* (head win) (exp (- 0 (* 2 (* pi (* 0+i freq)))))))))
+    (- (tail win)
+       (* (head win) (exp (- 0 (* 2 (* pi (* 0+i freq)))))))))
 (def goertzel-fir
   (fn ((freq 0) (post-iir 1))
-      (goertzel-fir-step freq (unsafe-unbox (take-right 2 post-iir)))))
+    (goertzel-fir-step freq (unsafe-unbox (take-right 2 post-iir)))))
 (def goertzel
   (fn ((freq 0) (signal 1))
-      ;; magnitude must be scaled down by half the buffer length
-      ;; result phase is how far from 0 (i.e., 2π) the buffer's last sample is
-      (/ (goertzel-fir freq (goertzel-iir freq signal))
-         (/ (length signal) 2))))
+    ;; magnitude must be scaled down by half the buffer length
+    ;; result phase is how far from 0 (i.e., 2π) the buffer's last sample is
+    (/ (goertzel-fir freq (goertzel-iir freq signal))
+       (/ (length signal) 2))))
 
 
