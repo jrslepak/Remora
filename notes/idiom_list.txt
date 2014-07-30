@@ -1,0 +1,42 @@
+1. REMDUP	W←((V⍳V)=⍳⍴V)/V
+Uses an index-of operator, which we don't currently have, to implement nub-sieve (use iota to generate list of indices, compare each index with corresponding element's first index). Then uses nub-sieve to implement nub.
+This operator is already provided as a primitive in J and Dynamic Remora.
+Translating would require adding an index-of operator.
+
+
+2. EXPAND	D←(1↓⍴A)⌈⍴B
+		A←(((1↑⍴A),D)↑A),[1]D↑B
+Adds a new item B to an array A, padding the existing items or the new item as needed.
+First, the item shape of A and the shape of B are combined with max to get the new item shape. APL's take function allows the programmer to ask for more elements than are present -- the "extra" spaces are filled with 0 or ' ' depending on whether the original array contained numbers or characters (another use of filling, which does not generalize nicely to other types). It also requires the shape of the "how many" argument to be the same as the rank of the "source" argument (J's take allows a shorter input vector).
+Remora's take does not behave this way. Maybe it should? As it stands now, getting 2x3 from the corner of a matrix is
+  (take 2 (#r(0 1)take 3 matrix))
+instead of
+  (take [2 3] matrix)
+We would have to add a length operator to the index language. Either way, the filling behavior won't really work, so we can't get the padding.
+
+
+3. Bar Graph	W←V∘.≥⍳⌈/V
+The maximum bar size is found by reducing V with max. Passing the max size to iota gets a vector of the right length. The outer product of the original vector and that counting-up vector puts a 1 in cells where the original (row #) is greater than or equal to the "count" (col #).
+In the Racket embedding, the issue I hit is what to use as the base case when folding with max. There is no "exact infinity," and max produces inexact results given any inexact input. For now, I have an explicit conversion back to exact numbers, but maybe iota should coerce inexact to exact on its own.
+We also have to take into account that the J/Remora starts at 0 whereas the APL iota starts at 1.
+(fn ((vec 1))
+  (unbox count (iota [(inexact->exact (foldr max -inf.0 vec))])
+    (box (bool->int (#r(0 1)>= vec (add1 count))))))
+
+
+4. TO		V←A,A+(×B-A)×⍳|B-A
+The signum of the endpoints' difference is which direction we count (up or down). The absolute value of the difference is how many extra elements we need to generate. Multiplying these gets a vector of offsets from the left endpoint. Adding them to the left endpoint and then prepending the left endpoint itself produces the final result.
+(fn ((left 0) (right 0))
+  (unbox count (iota [(abs (- right left))])
+    (append [left]
+            (+ left (* (signum (- right left))
+                       (add1 count))))))
+
+
+5. Blank removal:
+	a. Eliminate leading blanks:
+	a. Eliminate trailing blanks:
+	a. Multiple blanks reduced to a single blank:
+
+
+6. Character-number conversions:

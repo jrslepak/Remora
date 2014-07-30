@@ -99,3 +99,22 @@
        (/ (length signal) 2))))
 
 
+
+
+;;; Construct a histogram of a vector of naturals
+;;; The "bar" for each number is a sequence of #t, followed by as many #f as
+;;; needed to fill the remaining space.
+(def histogram
+  (fn ((vec 1))
+    (unbox count (iota [(inexact->exact (foldr max -inf.0 vec))])
+      (box (#r(0 1)>= vec (add1 count))))))
+
+
+;;; Construct boxed vector of integers counting from left to right, either up
+;;; or down as needed.
+(def range
+  (fn ((left 0) (right 0))
+    (unbox count (iota [(abs (- right left))])
+      (append [left]
+              (+ left (* (signum (- right left))
+                         (add1 count)))))))
