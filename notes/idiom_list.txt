@@ -34,9 +34,20 @@ The signum of the endpoints' difference is which direction we count (up or down)
 
 
 5. Blank removal:
-	a. Eliminate leading blanks:
-	a. Eliminate trailing blanks:
-	a. Multiple blanks reduced to a single blank:
+	a. Eliminate leading blanks: W←(∨\S≠' ')/S
+Comparing the string with the space character gives a boolean vector indicating which characters in the string are spaces. Scanning that vector with or identifies which characters appear at or after the first non-space. The result is them used to filter the string.
+Remora's scan function includes the "initial" result, which must be dropped here. Remora's filter produces a box because the result's length is indeterminate. There is also some marshalling that must be done to turn Racket strings into character arrays (not shown here).
+(fn ((str 1))
+  (filter (behead (scan or #f (not (equal? #\space str))))
+          str))
+
+	b. Eliminate trailing blanks: W←(⌽∨\⌽S≠' ')/S
+Similar to eliminating leading blanks, but we reverse the string to construct the filter and then reverse the filter to apply it to the non-reversed string.
+(fn ((str 1))
+  (filter (reverse (behead (scan or #f (not (equal? #\space (reverse str))))))
+          str))
+
+	c. Multiple blanks reduced to a single blank:
 
 
 6. Character-number conversions:

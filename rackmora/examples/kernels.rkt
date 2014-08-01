@@ -118,3 +118,15 @@
       (append [left]
               (+ left (* (signum (- right left))
                          (add1 count)))))))
+
+;;; Drop leading spaces from a character vector
+(def drop-leading-space
+  (fn ((str 1))
+    (filter (behead (scan or #f (not (equal? #\space str))))
+            str)))
+
+;;; Drop trailing spaces from a character vector
+(def drop-trailing-space
+  (fn ((str 1))
+    (filter (reverse (behead (scan or #f (not (equal? #\space (reverse str))))))
+            str)))
