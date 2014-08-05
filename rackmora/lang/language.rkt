@@ -2,9 +2,35 @@
 
 (require racket/provide
          racket/require
-         "syntax.rkt"
+         (except-in "syntax.rkt"
+                    Rλ)
+         (only-in "semantics.rkt"
+                  debug-mode
+                  build-vec
+                  rem-box
+                  remora-apply
+                  racket->remora)
+         #;
          (except-in "semantics.rkt"
-                    list->array)
+                    apply-rem-array
+                    rem-array
+                    rem-array?
+                    rem-array-shape
+                    rem-array-data
+                    rem-array-rank
+                    rem-array->vector
+                    rem-proc
+                    rem-proc?
+                    rem-proc-body
+                    rem-proc-ranks
+                    rem-box
+                    rem-box?
+                    rem-box-contents
+                    subvector
+                    rem-scalar-proc
+                    scalar->atom
+                    list->array
+                    array->nest)
          ;"basis-lib.rkt"
          (for-syntax racket/base
                      syntax/parse)

@@ -346,6 +346,8 @@
 ;;; A Remora box (dependent sum) has
 ;;; - contents, a Remora value
 ;;; - indices, a list of the witness indices
+;;; TODO: should this just require contents to be a rem-value? would permit
+;;; box inside another box (allowed in J)
 (provide (contract-out
           (struct rem-box ([contents rem-array?]))))
 (define-struct rem-box (contents)
