@@ -48,6 +48,19 @@ Similar to eliminating leading blanks, but we reverse the string to construct th
           str))
 
 	c. Multiple blanks reduced to a single blank:
+After constructing a boolean vector which identifies which character positions contain spaces, we or that vector with a shifted version of itself to identify positions of digrams that are not two spaces. The characters at those positions are kept; the characters at other positions are the beginning of a '  ' digram and so are dropped.
+(fn ((str 1))
+  (filter (or (not (equal? #\space str))
+              (behead (rotate (append [#t] (not (equal? #\space str))) 1)))
+          str))
+
 
 
 6. Character-number conversions:
+	a. Number of digits needed: D←⌊1+10⍟N
+The number of digits in a positive number is one more than its (common) log, rounded down.
+(fn ((num 0))
+  (floor (add1 (log num))))
+
+	a(i). For possibly non-positive number: D←⌊1+10⍟N|N+N=0
+This alternate version does not seem to work.

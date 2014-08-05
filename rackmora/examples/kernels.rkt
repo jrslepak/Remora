@@ -101,6 +101,9 @@
 
 
 
+;;;-------------------------------------
+;;; Translated Perlis idioms
+;;;-------------------------------------
 ;;; Construct a histogram of a vector of naturals
 ;;; The "bar" for each number is a sequence of #t, followed by as many #f as
 ;;; needed to fill the remaining space.
@@ -130,3 +133,15 @@
   (fn ((str 1))
     (filter (reverse (behead (scan or #f (not (equal? #\space (reverse str))))))
             str)))
+
+;;; Collapse multiple consecutive spaces to a single space
+(def collapse-multiple-space
+  (fn ((str 1))
+    (filter (or (not (equal? #\space str))
+                (behead (rotate (append [#t] (not (equal? #\space str))) 1)))
+            str)))
+
+;;; Determine how many decimal digits are needed to represent a positive number
+(def num-digits
+  (fn ((num 0))
+    (floor (add1 (log num)))))
