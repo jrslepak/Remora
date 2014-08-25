@@ -870,3 +870,39 @@
 ;;; Construct a Racket string from a Remora vector of characters
 (remora (def R_array->string
           (fn ((arr 1)) (list->string (R_array->list arr)))))
+
+;;; Search an associative array (vector of length-2 lists)
+;;; We won't be able to type this without a cast that effectively assumes at
+;;; least one result is found.
+(remora
+ (def R_lookup
+   (fn ((needle all) (haystack 1))
+     (unbox results (R_filter
+                     ((fn ((table-entry 0)) (R_equal needle
+                                                     (first table-entry)))
+                      haystack)
+                     haystack)
+       (second (R_head results))))))
+;;; Like R_lookup but with an alternative value to use in case the desired key
+;;; is not present
+(remora
+ (def R_lookup+
+   (fn ((needle all) (haystack 1) (alternate all))
+     (unbox results (R_filter
+                     ((fn ((table-entry 0)) (R_equal needle
+                                                     (first table-entry)))
+                      haystack)
+                     haystack)
+       (second (R_head (R_append results [array
+                                          (list 'missing alternate)])))))))
+;;; Like R_lookup but returning every matching value
+(remora
+ (def R_lookup*
+   (fn ((needle all) (haystack 1) (alternate all))
+     (unbox results (R_filter
+                     ((fn ((table-entry 0)) (R_equal needle
+                                                     (first table-entry)))
+                      haystack)
+                     haystack)
+       (second (R_head (R_append results [array
+                                          (list 'missing alternate)])))))))
