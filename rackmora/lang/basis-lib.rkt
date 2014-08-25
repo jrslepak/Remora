@@ -495,8 +495,8 @@
    #()
    (vector
     (Rλ ([arr 'all])
-        (rem-array (vector (vector-length (rem-array-shape arr)))
-                   (rem-array-shape arr))))))
+        (rem-array (vector (vector-length (rem-value-shape arr)))
+                   (rem-value-shape arr))))))
 (module+ test
   (check-equal? (remora (R_shape-of (alit (4 1 2) 3 6 2 3 5 2 3 4)))
                 (remora (array 4 1 2))))
