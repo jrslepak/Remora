@@ -7,6 +7,8 @@
                     #;rackmora)]
 @defmodulelang[rackmora]
 
+@title[#:version "" #:date ""]{Remora Tutorial}
+
 @(sandbox-output 'string)
 @(printf "sandbox-output is now ~v\n" (sandbox-output))
 @(define example-evaluator

@@ -1,7 +1,8 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
                                box unbox)
-                    rackmora)]
+                    rackmora)
+         scribble/eval]
 @;@declare-exporting[rackmora]
 @title{Integration with Racket code}
 
@@ -45,3 +46,25 @@ stored as the @racket[data] field.
 The constructor is protected by a dependent contract which requires that the
 number of atoms be equal to the product of the dimensions.
 }
+
+Procedures can also be constructed directly.
+@defstruct[rem-proc ([body procedure?]
+                     [ranks (listof (or/c exact-nonnegative-integer? 'all))])
+                     #:transparent]{
+Wrap the given Racket procedure as a @code[]{rackmora} procedure with the given
+expected ranks.
+The @racket[body] must be a procedure which consumes and produces
+@code[]{rackmora} arrays.
+}
+
+@interaction[
+(require rackmora)
+(define elts-sum
+  (rem-proc
+   (λ (arr)
+     (rem-array #()
+                (vector (for/sum ([i (rem-array-data arr)]) i))))
+   '(all)))
+(remora
+ (elts-sum (alit (2 3) 1 2 3 4 5 6)))
+]
