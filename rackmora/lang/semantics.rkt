@@ -45,7 +45,7 @@
                    (arr args)]
         (when (debug-mode) (printf "~v - ~v\n" p t))
         (if (equal? 'all t)
-            (rem-array-rank arr)
+            (rem-value-rank arr)
             t))))
   (when (debug-mode) (printf "individual expected ranks are ~v\n"
                              individual-exp-ranks))
@@ -356,6 +356,9 @@
 ;;; More permissive variants of rem-array functions
 ;;; Find the shape of a Remora value (array or box)
 ;;; Boxes are considered to have scalar shape
+(provide (contract-out
+          (rem-value-shape (-> rem-value?
+                               (vectorof exact-nonnegative-integer?)))))
 (define (rem-value-shape v)
   (cond [(rem-array? v) (rem-array-shape v)]
         [(rem-box? v) #()]))
