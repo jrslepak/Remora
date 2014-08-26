@@ -1,4 +1,4 @@
-#lang rackmora
+#lang remora/dynamic
 
 ;;; Defining and using a function
 

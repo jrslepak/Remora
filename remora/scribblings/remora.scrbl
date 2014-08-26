@@ -1,9 +1,11 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
                                box unbox)
-                    rackmora)]
+                    remora/dynamic)]
 
-@title[#:tag '("rackmora" "remora")]{Array-oriented programming}
+@title[#:tag '("rackmora"
+               "remora"
+               "remora/dynamic")]{Array-oriented programming}
 
 @author[(author+email "Justin Slepak" "jrslepak@ccs.neu.edu" #:obfuscate? #t)]
 

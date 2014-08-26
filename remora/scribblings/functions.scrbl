@@ -1,9 +1,9 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
                                box unbox)
-                    rackmora)]
+                    remora/dynamic)]
 
-@defmodulelang[rackmora]
+@defmodulelang[remora/dynamic]
 @title{Functions}
 
 @defform[(fn ((id rank) ...) body ...+)]{

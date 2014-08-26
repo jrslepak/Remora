@@ -1,4 +1,4 @@
-#lang rackmora
+#lang remora/dynamic
 
 
 ;;; Naive Bayes classifier for the Spambase Data Set from UC Irvine's

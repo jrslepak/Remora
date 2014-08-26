@@ -1,4 +1,4 @@
-#lang rackmora
+#lang remora/dynamic
 (def countdown (+ 1 (reverse (unsafe-unbox (iota [99])))))
 (display
  (foldr

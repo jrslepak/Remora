@@ -1,5 +1,5 @@
 #lang s-exp syntax/module-reader
-rackmora/lang/language
+remora/dynamic/lang/language
 #:read remora-read
 #:read-syntax remora-read-syntax
 (require "semantics.rkt"

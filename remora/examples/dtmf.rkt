@@ -1,4 +1,4 @@
-#lang rackmora
+#lang remora/dynamic
 (require racket/math
          (only-in racket/list first second))
 

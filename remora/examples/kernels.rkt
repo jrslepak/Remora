@@ -1,4 +1,4 @@
-#lang rackmora
+#lang remora/dynamic
 (require racket/math)
 ;;; TODO: figure out why all-defined-out doesn't export def'd things but
 ;;; they can still be exported by explicitly naming them
