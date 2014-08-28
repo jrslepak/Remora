@@ -1,7 +1,7 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
                                box unbox)
-                    remora/dynamic)
+                    remora/dynamic/main)
          scribble/eval]
 @;@declare-exporting[remora/dynamic]
 @title{Integration with Racket code}
@@ -23,7 +23,7 @@ For example, Racket's built-in @racket[gcd] can be applied to Remora arrays:
 
 
 @section{Using Remora as a Library}
-@defmodule[remora/dynamic]
+@defmodule[remora/dynamic/main]
 A Racket program can embed small pieces of Remora code.
 Primitive operations (@italic{i.e.}, those provided by the
 @racket[remora/dynamic] library) have ``@code[]{R_}'' prepended to their names
@@ -58,7 +58,7 @@ Remora arrays.
 }
 
 @interaction[
-(require remora/dynamic)
+(require remora/dynamic/main)
 (define elts-sum
   (rem-proc
    (λ (arr)

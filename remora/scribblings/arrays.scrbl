@@ -1,7 +1,7 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
                                box unbox)
-                    remora/dynamic)]
+                    remora/dynamic/main)]
 @;@declare-exporting[rackmora]
 @defmodulelang[remora/dynamic]
 @title{Arrays}

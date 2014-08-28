@@ -4,7 +4,7 @@
                                #%module-begin
                                #%top-interaction)
                     remora/dynamic/lang/language
-                    remora/dynamic)]
+                    #;remora/dynamic/main)]
 
 @defmodulelang[remora/dynamic]
 @title{Boxes: handling irregular data}

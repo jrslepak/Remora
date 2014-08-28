@@ -1,7 +1,7 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
                                box unbox)
-                    remora/dynamic)]
+                    remora/dynamic/main)]
 
 @title[#:tag '("rackmora"
                "remora"
@@ -40,6 +40,7 @@
 
 @local-table-of-contents[]
 
+@include-section["tutorial.scrbl"]
 @include-section["arrays.scrbl"]
 @include-section["functions.scrbl"]
 @include-section["application.scrbl"]

@@ -1,6 +1,6 @@
 #lang scribble/manual
 @require[(for-label remora/dynamic/lang/language
-                    #;remora/dynamic)]
+                    #;remora/dynamic/main)]
 @;@declare-exporting[remora/dynamic]
 @defmodule[remora/dynamic]
 @title{Built-in functions}
