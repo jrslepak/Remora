@@ -1,2 +1,2 @@
 #lang setup/infotab
-(define scribblings '(("scribblings/remora.scrbl" ())))
+(define scribblings '(("scribblings/remora.scrbl")))

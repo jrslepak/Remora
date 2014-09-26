@@ -3,7 +3,8 @@
                                box unbox)
                     remora/dynamic/main)]
 
-@defmodulelang[remora/dynamic]
+@;defmodulelang[remora/dynamic]
+@declare-exporting[remora/dynamic/main]
 @title{Functions}
 
 @defform[(fn ((id rank) ...) body ...+)]{

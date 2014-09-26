@@ -3,10 +3,11 @@
                                box unbox
                                #%module-begin
                                #%top-interaction)
-                    remora/dynamic/lang/language
-                    #;remora/dynamic/main)]
+                    remora/dynamic/main
+                    #;remora/dynamic)]
 
-@defmodulelang[remora/dynamic]
+@;defmodulelang[remora/dynamic]
+@declare-exporting[remora/dynamic/main]
 @title{Boxes: handling irregular data}
 
 A box wraps an array of arbitrary shape in a scalar structure.

@@ -3,7 +3,9 @@
                                box unbox)
                     remora/dynamic/main)]
 
-@defmodulelang[remora/dynamic]
+@;defmodulelang[remora/dynamic]
+@declare-exporting[remora/dynamic/main]
+
 @title{Function Application}
 
 A function application form applies an array of functions to arrays of

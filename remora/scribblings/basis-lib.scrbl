@@ -1,8 +1,8 @@
 #lang scribble/manual
 @require[(for-label remora/dynamic/lang/language
-                    #;remora/dynamic/main)]
-@;@declare-exporting[remora/dynamic]
-@defmodule[remora/dynamic]
+                    #;remora/dynamic)]
+@declare-exporting[remora/dynamic/lang/language]
+@;defmodule[remora/dynamic/lang/language]
 @title{Built-in functions}
 
 @;{
@@ -13,13 +13,16 @@
 @defproc[(/ [x 0] [y 0]) 0]{Division}
 }
 
-@defproc[(and [x 0] [y 0]) 0]{Logical AND}
+@defproc[(and [x 0] [y 0]) 0]{Logical And}
 @defproc[(or [x 0] [y 0]) 0]{Logical Or}
 
 @defproc[(signum [x 0]) 0]{
 Find the sign of a nonzero number, or more generally,
 normalize a complex number to unit magnitude.}
-
+@;{
+@defthing[#:kind "procedure" signum (-> [x 0] 0)]{
+Find the sign of a nonzero number, or more generally,
+normalize a complex number to unit magnitude.}}
 
 @defproc[(logb [b 0] [x 0]) 0]{
 Logarithm of @racket[x] with base @racket[b]}

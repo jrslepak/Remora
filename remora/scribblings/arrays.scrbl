@@ -2,8 +2,8 @@
 @require[(for-label (except-in racket/base
                                box unbox)
                     remora/dynamic/main)]
-@;@declare-exporting[rackmora]
-@defmodulelang[remora/dynamic]
+@;@defmodulelang[remora/dynamic]
+@declare-exporting[remora/dynamic/main]
 @title{Arrays}
 
 All computation in array-oriented programming is performed on arrays. An array

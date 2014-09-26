@@ -1,7 +1,7 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
                                box unbox)
-                    remora/dynamic/main)]
+                    (lib "remora/dynamic/main.rkt"))]
 
 @title[#:tag '("rackmora"
                "remora"
@@ -38,6 +38,7 @@
    importing & exporting in #lang mode;
    library/EDSL mode}
 
+@;defmodulelang[remora/dynamic]
 @local-table-of-contents[]
 
 @include-section["tutorial.scrbl"]
