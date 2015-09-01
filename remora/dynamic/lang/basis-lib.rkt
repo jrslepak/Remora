@@ -741,6 +741,25 @@
                 (remora (array 10 -10))))
 
 
+;;; reduce a vector (not list!) of Remora arrays using a Remora function array
+;;; note: reduce assumes associativity and has no "base" value
+(define (rem-reduce op arrays)
+  (cond [(= 1 (vector-length arrays)) (vector-ref arrays 0)]
+        [else (define-values (left right)
+                (vector-split-at arrays (ceiling (/ (vector-length arrays) 2))))
+              (remora-apply op (rem-reduce op left) (rem-reduce op right))]))
+(define R_reduce
+  (rem-array
+   #()
+   (vector
+    (Rλ ([op 'all] [arr 'all])
+        (rem-reduce op (list->vector (array->cell-list arr -1)))))))
+(module+ test
+  (check-equal? (remora (R_reduce + (array 1 2 3 4)))
+                (remora 10))
+  (check-equal? (remora (R_reduce (array + *) (array 1 2 3 4)))
+                (remora (array 10 24))))
+
 ;;; Extract a box's contents
 ;;; Applying this to an array of boxes risks producing result cells with
 ;;; mismatching shapes.
