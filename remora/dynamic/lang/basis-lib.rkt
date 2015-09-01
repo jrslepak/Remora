@@ -908,3 +908,22 @@
                      haystack)
        (second (R_head (R_append results [array
                                           (list 'missing alternate)])))))))
+
+;;; Construct and destruct pairs
+(define R_pair
+  (rem-array
+   #()
+   (vector (Rλ ([new-car all] [new-cdr all])
+               (rem-array #() (vector (cons new-car new-cdr)))))))
+(define R_fst
+  (rem-array
+   #()
+   (vector (Rλ ([pair 0])
+               (car (scalar->atom pair))
+               #;(rem-array #() (vector (car (scalar->atom pair))))))))
+(define R_snd
+  (rem-array
+   #()
+   (vector (Rλ ([pair 0])
+               (cdr (scalar->atom pair))
+               #;(rem-array #() (vector (cdr (scalar->atom pair))))))))
