@@ -371,7 +371,7 @@
   (reverse
    (for/fold ([acc (list init) #;(list (sequence-ref xs 0))])
      ([elt xs #;(sequence-tail xs 1)])
-     (cons (op elt (first acc)) acc))))
+     (cons (op (first acc) elt) acc))))
 
 (define R_scan
   (rem-array
@@ -396,6 +396,8 @@
              result-items
              (vector (length result-items))))))))
 (module+ test
+  (check-equal? (remora (R_scan - 0 (array 1 2 3)))
+                (remora (array 0 -1 -3 -6)))
   (check-equal? (remora (R_scan + (array 0 0) (array (array 1 2)
                                                      (array 3 4))))
                 (remora (array (array 0 0)
