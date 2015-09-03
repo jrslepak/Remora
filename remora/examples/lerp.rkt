@@ -3,10 +3,9 @@
 ;;; Defining and using a function
 
 ;;; find the number part way between two boundaries
-(def lerp
-  (fn ((lo 0) (hi 0) (α 0))
-    (+ (* α hi)
-       (* (- 1 α) lo))))
+(def (lerp (lo 0) (hi 0) (α 0))
+  (+ (* α hi)
+     (* (- 1 α) lo)))
 
 ;;; three fifths of the way from -1 to 1
 (lerp -1 1 3/5)

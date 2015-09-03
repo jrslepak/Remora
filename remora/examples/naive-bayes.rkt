@@ -70,53 +70,51 @@
 ;;; its being on that side if the message is spam. The product of those
 ;;; probabilities is this message's probability of that high/low arrangement if
 ;;; it is spam. (Similar for legit messages)
-(def threshold-side-prob
-  (fn ((val 0) (threshold 0) (below-prob 0))
-    (select (< val threshold) below-prob (- 1 below-prob))))
+(def (threshold-side-prob (val 0) (threshold 0) (below-prob 0))
+  (select (< val threshold) below-prob (- 1 below-prob)))
 
 ;;; Decide how confident we are in a message's spam/legit status
-(def classify
-  (fn ((message all))
-    ;; probability of this feature set given that this message is spam
-    (def features-given-spam
-      (#r(0 0 1)foldr
-         *
-         1
-         (#r(1 1 1)threshold-side-prob
-            message
-            feature-means
-            prob-spam-low)))
-    ;; probability of this feature set given that this message is legit
-    (def features-given-legit
-      (#r(0 0 1)foldr
-         *
-         1
-         (#r(1 1 1)threshold-side-prob
-            message
-            feature-means
-            prob-legit-low)))
-    ;; probability of this feature set independent of spam/legit status
-    (def features-net
-      (#r(0 0 1)foldr
-         *
-         1
-         (+ (* net-prob
-               (#r(1 1 1)threshold-side-prob
-                  message
-                  feature-means
-                  prob-spam-low))
-            (* (- 1 net-prob)
-               (#r(1 1 1)threshold-side-prob
-                  message
-                  feature-means
-                  prob-legit-low)))))
-    ;; Apply Bayes's theorem to determine probability the message
-    ;; is spam given its features
-    (def prob-spam (fl/ (* net-prob features-given-spam)
-                        features-net))
-    (def prob-legit (fl/ (* (- 1 net-prob) features-given-legit)
-                         features-net))
-    (log (fl/ prob-spam prob-legit))))
+(def (classify (message all))
+  ;; probability of this feature set given that this message is spam
+  (def features-given-spam
+    (#r(0 0 1)foldr
+       *
+       1
+       (#r(1 1 1)threshold-side-prob
+          message
+          feature-means
+          prob-spam-low)))
+  ;; probability of this feature set given that this message is legit
+  (def features-given-legit
+    (#r(0 0 1)foldr
+       *
+       1
+       (#r(1 1 1)threshold-side-prob
+          message
+          feature-means
+          prob-legit-low)))
+  ;; probability of this feature set independent of spam/legit status
+  (def features-net
+    (#r(0 0 1)foldr
+       *
+       1
+       (+ (* net-prob
+             (#r(1 1 1)threshold-side-prob
+                message
+                feature-means
+                prob-spam-low))
+          (* (- 1 net-prob)
+             (#r(1 1 1)threshold-side-prob
+                message
+                feature-means
+                prob-legit-low)))))
+  ;; Apply Bayes's theorem to determine probability the message
+  ;; is spam given its features
+  (def prob-spam (fl/ (* net-prob features-given-spam)
+                      features-net))
+  (def prob-legit (fl/ (* (- 1 net-prob) features-given-legit)
+                       features-net))
+  (log (fl/ prob-spam prob-legit)))
 
 
 ;;; Find confidence level for every test message

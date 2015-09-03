@@ -1,5 +1,5 @@
 #lang remora/dynamic
-(def countdown (+ 1 (reverse (unsafe-unbox (iota [99])))))
+(def countdown (+ 1 (reverse (iota [99]))))
 (display
  (foldr
   string-append
