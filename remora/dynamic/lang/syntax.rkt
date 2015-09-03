@@ -245,6 +245,8 @@
 ;;; (def name defn-or-expr ... expr)
 (define-remora-syntax (def stx)
   (syntax-parse stx
+    [(_ (funname:id (var:id rank:RANK) ...) body ...+)
+     #'(remora (def funname (fn ((var rank) ...) body ...)))]
     [(_ name defn-or-expr )
      #'(define name (remora defn-or-expr) )]))
 
