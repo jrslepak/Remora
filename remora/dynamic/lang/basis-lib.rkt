@@ -144,6 +144,26 @@
    (vector
     (Rλ ([n 0] [arr 'all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
+        (rem-array (vector-append (vector (scalar->atom n)) cell-shape)
+                   (vector-take (rem-array-data arr)
+                                (* (for/product ([d cell-shape]) d)
+                                   (scalar->atom n))))))))
+(module+ test
+  (check-equal?
+   (remora (R_take 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (array (array 0 1 2)
+                  (array 3 4 5))))
+  (check-equal?
+   (remora ((rerank (0 1) R_take) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (array (array 0 1)
+                  (array 3 4)
+                  (array 6 7)))))
+(define R_take*
+  (rem-array
+   #()
+   (vector
+    (Rλ ([n 0] [arr 'all])
+        (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-box
          (rem-array (vector-append (vector (scalar->atom n)) cell-shape)
                     (vector-take (rem-array-data arr)
@@ -151,16 +171,36 @@
                                     (scalar->atom n)))))))))
 (module+ test
   (check-equal?
-   (remora (R_take 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (R_take* 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
    (remora (box (array (array 0 1 2)
                        (array 3 4 5)))))
   (check-equal?
-   (remora ((rerank (0 1) R_take) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora ((rerank (0 1) R_take*) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
    (remora (array (box (array 0 1))
                   (box (array 3 4))
                   (box (array 6 7))))))
 
 (define R_take-right
+  (rem-array
+   #()
+   (vector
+    (Rλ ([n 0] [arr 'all])
+        (define cell-shape (vector-drop (rem-array-shape arr) 1))
+        (rem-array (vector-append (vector (scalar->atom n)) cell-shape)
+                   (vector-take-right (rem-array-data arr)
+                                      (* (for/product ([d cell-shape]) d)
+                                         (scalar->atom n))))))))
+(module+ test
+  (check-equal?
+   (remora (R_take-right 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (array (array 3 4 5)
+                  (array 6 7 8))))
+  (check-equal?
+   (remora ((rerank (0 1) R_take-right) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (array (array 1 2)
+                  (array 4 5)
+                  (array 7 8)))))
+(define R_take-right*
   (rem-array
    #()
    (vector
@@ -173,16 +213,38 @@
                                           (scalar->atom n)))))))))
 (module+ test
   (check-equal?
-   (remora (R_take-right 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (R_take-right* 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
    (remora (box (array (array 3 4 5)
                        (array 6 7 8)))))
   (check-equal?
-   (remora ((rerank (0 1) R_take-right) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora ((rerank (0 1) R_take-right*) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
    (remora (array (box (array 1 2))
                   (box (array 4 5))
                   (box (array 7 8))))))
 
 (define R_drop
+  (rem-array
+   #()
+   (vector
+    (Rλ ([n 0] [arr 'all])
+        (define cell-shape (vector-drop (rem-array-shape arr) 1))
+        (rem-array (vector-append
+                    (vector (- (vector-ref (rem-array-shape arr) 0)
+                               (scalar->atom n)))
+                    cell-shape)
+                   (vector-drop (rem-array-data arr)
+                                (* (for/product ([d cell-shape]) d)
+                                   (scalar->atom n))))))))
+(module+ test
+  (check-equal?
+   (remora (R_drop 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (array (array 6 7 8))))
+  (check-equal?
+   (remora ((rerank (0 1) R_drop) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (array (array 2)
+                  (array 5)
+                  (array 8)))))
+(define R_drop*
   (rem-array
    #()
    (vector
@@ -198,15 +260,37 @@
                                     (scalar->atom n)))))))))
 (module+ test
   (check-equal?
-   (remora (R_drop 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (R_drop* 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
    (remora (box (array (array 6 7 8)))))
   (check-equal?
-   (remora ((rerank (0 1) R_drop) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora ((rerank (0 1) R_drop*) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
    (remora (array (box (array 2))
                   (box (array 5))
                   (box (array 8))))))
 
 (define R_drop-right
+  (rem-array
+   #()
+   (vector
+    (Rλ ([n 0] [arr 'all])
+        (define cell-shape (vector-drop (rem-array-shape arr) 1))
+        (rem-array (vector-append
+                    (vector (- (vector-ref (rem-array-shape arr) 0)
+                               (scalar->atom n)))
+                    cell-shape)
+                   (vector-drop-right (rem-array-data arr)
+                                      (* (for/product ([d cell-shape]) d)
+                                         (scalar->atom n))))))))
+(module+ test
+  (check-equal?
+   (remora (R_drop-right 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (array (array 0 1 2))))
+  (check-equal?
+   (remora ((rerank (0 1) R_drop-right) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (array (array 0)
+                  (array 3)
+                  (array 6)))))
+(define R_drop-right*
   (rem-array
    #()
    (vector
@@ -222,10 +306,10 @@
                                           (scalar->atom n)))))))))
 (module+ test
   (check-equal?
-   (remora (R_drop-right 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora (R_drop-right* 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
    (remora (box (array (array 0 1 2)))))
   (check-equal?
-   (remora ((rerank (0 1) R_drop-right) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
+   (remora ((rerank (0 1) R_drop-right*) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
    (remora (array (box (array 0))
                   (box (array 3))
                   (box (array 6))))))
@@ -512,6 +596,33 @@
         (define new-elt-count (for/product ([d (rem-array-data new-shape)]) d))
         (define old-elts (rem-array-data arr))
         (define old-elt-count (vector-length old-elts))
+        (rem-array
+         (rem-array-data new-shape)
+         (vector-take
+          (apply vector-append
+                 (for/list ([i (ceiling (/ new-elt-count old-elt-count))])
+                   old-elts))
+          new-elt-count))))))
+(module+ test
+  (check-equal? (remora (R_reshape (array 3 2)
+                                   (alit (9) 1 2 3 4 5 6 7 8 9)))
+                (remora (array (array 1 2)
+                               (array 3 4)
+                               (array 5 6))))
+  (check-equal? (remora (R_reshape (array 3 2)
+                                   (alit (5) 'a 'b 'c 'd 'e)))
+                (remora (array (array 'a 'b)
+                               (array 'c 'd)
+                               (array 'e 'a)))))
+(define R_reshape*
+  (rem-array
+   #()
+   (vector
+    (Rλ ([new-shape 1]
+         [arr 'all])
+        (define new-elt-count (for/product ([d (rem-array-data new-shape)]) d))
+        (define old-elts (rem-array-data arr))
+        (define old-elt-count (vector-length old-elts))
         (rem-box
          (rem-array
           (rem-array-data new-shape)
@@ -521,17 +632,17 @@
                     old-elts))
            new-elt-count)))))))
 (module+ test
-  (check-equal? (remora (R_reshape (array 3 2)
+  (check-equal? (remora (R_reshape* (array 3 2)
                                    (alit (9) 1 2 3 4 5 6 7 8 9)))
                 (remora (box (array (array 1 2)
                                     (array 3 4)
                                     (array 5 6)))))
-  (check-equal? (remora (R_reshape (array 3 2)
+  (check-equal? (remora (R_reshape* (array 3 2)
                                    (alit (5) 'a 'b 'c 'd 'e)))
                 (remora (box (array (array 'a 'b)
                                     (array 'c 'd)
                                     (array 'e 'a)))))
-  (check-equal? (remora (R_reshape (array (array 3 2)
+  (check-equal? (remora (R_reshape* (array (array 3 2)
                                           (array 2 3)
                                           (array 3 3))
                                    (alit (9) 1 2 3 4 5 6 7 8 9)))
@@ -550,18 +661,34 @@
    (vector
     (Rλ ([shape 1])
         (define size (for/product ([d (rem-array-data shape)]) d))
+        (rem-array (rem-array-data shape)
+                   (for/vector ([i size]) i))))))
+(module+ test
+  (check-equal? (remora (R_iota (array 4)))
+                (remora (array 0 1 2 3)))
+  (check-equal? (remora (R_iota (array 4 3)))
+                (remora (array (array 0 1 2)
+                               (array 3 4 5)
+                               (array 6 7 8)
+                               (array 9 10 11)))))
+(define R_iota*
+  (rem-array
+   #()
+   (vector
+    (Rλ ([shape 1])
+        (define size (for/product ([d (rem-array-data shape)]) d))
         (rem-box (rem-array (rem-array-data shape)
                             (for/vector ([i size]) i)))))))
 (module+ test
-  (check-equal? (remora (R_iota (array 4)))
+  (check-equal? (remora (R_iota* (array 4)))
                 (remora (box (array 0 1 2 3))))
-  (check-equal? (remora (R_iota (array 4 3)))
+  (check-equal? (remora (R_iota* (array 4 3)))
                 (remora (box (array (array 0 1 2)
                                     (array 3 4 5)
                                     (array 6 7 8)
                                     (array 9 10 11)))))
-  (check-equal? (remora (R_iota (array (array 4)
-                                       (array 3))))
+  (check-equal? (remora (R_iota* (array (array 4)
+                                        (array 3))))
                 (remora (array (box (array 0 1 2 3))
                                (box (array 0 1 2))))))
 
@@ -832,7 +959,7 @@
    #()
    (vector
     (Rλ ([length 0] [arr 'all])
-        (R_rotate arr (R_unsafe-unbox (R_iota (R_itemize length))))))))
+        (R_rotate arr (R_iota (R_itemize length)))))))
 (module+ test
   (check-equal? (remora (R_window 3 (array 1 2 3 4 5 6 7 8 9 10)))
                 (remora (array (array 1 2 3 4 5 6 7 8 9 10)

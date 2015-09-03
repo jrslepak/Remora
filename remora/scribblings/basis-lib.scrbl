@@ -52,14 +52,34 @@ Remora the last item of @racket[x]}
 @defproc[(take [n 0] [x 'all]) ★]{
 Extract the first @racket[n] items of @racket[x]}
 
+@defproc[(take* [n 0] [x 'all]) ★]{
+Like @code[#:lang "remora/dynamic"]{take}, but with the result
+@code[#:lang "remora/dynamic"]{box}ed to make lifting to
+different @code[#:lang "remora/dynamic"]{n} values safe.}
+
 @defproc[(take-right [n 0] [x 'all]) ★]{
 Extract the last @racket[n] items of @racket[x]}
+
+@defproc[(take-right* [n 0] [x 'all]) ★]{
+Like @code[#:lang "remora/dynamic"]{take-right}, but with the result
+@code[#:lang "remora/dynamic"]{box}ed to make lifting to
+different @code[#:lang "remora/dynamic"]{n} values safe.}
 
 @defproc[(drop [n 0] [x 'all]) ★]{
 Remove the first @racket[n] items of @racket[x]}
 
+@defproc[(drop* [n 0] [x 'all]) ★]{
+Like @code[#:lang "remora/dynamic"]{drop}, but with the result
+@code[#:lang "remora/dynamic"]{box}ed to make lifting to
+different @code[#:lang "remora/dynamic"]{n} values safe.}
+
 @defproc[(drop-right [n 0] [x 'all]) ★]{
 Remove the last @racket[n] items of @racket[x]}
+
+@defproc[(drop-right* [n 0] [x 'all]) ★]{
+Like @code[#:lang "remora/dynamic"]{drop-right}, but with the result
+@code[#:lang "remora/dynamic"]{box}ed to make lifting to
+different @code[#:lang "remora/dynamic"]{n} values safe.}
 
 @defproc[(reverse [x 'all]) ★]{
 Reverse the items of @racket[x]}
@@ -133,11 +153,23 @@ Construct an array whose dimensions are the atoms of
 necessary).
 }
 
+@defproc[(reshape* [new-shape 1] [x 'all]) ★]{
+Like @code[#:lang "remora/dynamic"]{reshape}, but wraps the result in a
+@code[#:lang "remora/dynamic"]{box} so that this procedure is safe for lifting
+to multiple different @code[#:lang "remora/dynamic"]{new-shape}s.
+}
+
 @defproc[(iota [new-shape 1]) ★]{
 Construct an array whose dimensions are the atoms of
 @code[#:lang "remora/dynamic"]{new-shape} and whose atoms are the first
 @italic{n} natural numbers, where @italic{n} is the product of the atoms of
 @code[#:lang "remora/dynamic"]{new-shape}.
+}
+
+@defproc[(iota* [new-shape 1]) ★]{
+Like @code[#:lang "remora/dynamic"]{iota}, but wraps the result in a
+@code[#:lang "remora/dynamic"]{box} so that this procedure is safe for lifting
+to multiple different @code[#:lang "remora/dynamic"]{new-shape}s.
 }
 
 @defproc[(nub [x 'all]) ★]{
