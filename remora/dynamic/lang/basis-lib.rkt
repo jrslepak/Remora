@@ -870,17 +870,18 @@
 
 ;;; reduce a vector (not list!) of Remora arrays using a Remora function array
 ;;; note: reduce assumes associativity and has no "base" value
-(define (rem-reduce op arrays)
-  (cond [(= 1 (vector-length arrays)) (vector-ref arrays 0)]
+(define (rem-reduce op base arrays)
+  (cond [(= 0 (vector-length arrays)) base]
+        [(= 1 (vector-length arrays)) (vector-ref arrays 0)]
         [else (define-values (left right)
                 (vector-split-at arrays (ceiling (/ (vector-length arrays) 2))))
-              (remora-apply op (rem-reduce op left) (rem-reduce op right))]))
+              (remora-apply op (rem-reduce op base left) (rem-reduce op base right))]))
 (define R_reduce
   (rem-array
    #()
    (vector
-    (Rλ ([op 'all] [arr 'all])
-        (rem-reduce op (list->vector (array->cell-list arr -1)))))))
+    (Rλ ([op 'all] [base 'all] [arr 'all])
+        (rem-reduce op base (list->vector (array->cell-list arr -1)))))))
 (module+ test
   (check-equal? (remora (R_reduce + (array 1 2 3 4)))
                 (remora 10))

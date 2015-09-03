@@ -32,13 +32,13 @@
   (def analog-freqs (lookup+ key [row-freqs col-freqs] 0))
   (def digital-freqs (/ analog-freqs audio-sample-rate))
   (def num-samples (inexact->exact (ceiling (* duration audio-sample-rate))))
-  (foldr + 0 (sinusoid num-samples digital-freqs 0)))
+  (reduce + 0 (sinusoid num-samples digital-freqs 0)))
 ;;; Version with less naming of intermediate results
 (def (dtmf-encode* (key 0) (duration 0))
-  (foldr + 0 (sinusoid
-              (inexact->exact (ceiling (* duration audio-sample-rate)))
-              (/ (lookup+ key [row-freqs col-freqs] 0) audio-sample-rate)
-              0)))
+  (reduce + 0 (sinusoid
+               (inexact->exact (ceiling (* duration audio-sample-rate)))
+               (/ (lookup+ key [row-freqs col-freqs] 0) audio-sample-rate)
+               0)))
 
 
 ;;; Goertzel algorithm (extract single frequency component)
@@ -57,7 +57,7 @@
   (- (tail win)
      (* (head win) (exp (- 0 (* 2 (* pi (* 0+i freq))))))))
 (def (goertzel-fir (freq 0) (post-iir 1))
-  (goertzel-fir-step freq (unsafe-unbox (take-right 2 post-iir))))
+  (goertzel-fir-step freq (take-right 2 post-iir)))
 (def (goertzel (freq 0) (signal 1))
   ;; magnitude must be scaled down by half the buffer length
   ;; result phase is how far from 0 (i.e., 2π) the buffer's last sample is
@@ -66,7 +66,7 @@
 
 
 ;;; Identify the greatest number in a vector
-(def (vec-max (vec 1)) (foldr max (head vec) vec))
+(def (vec-max (vec 1)) (reduce max (head vec) vec))
 
 
 ;;; Get the normalized magnitudes of the row and column frequencies in a signal

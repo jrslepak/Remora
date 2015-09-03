@@ -19,10 +19,8 @@
 
 ;;; Split out 10% of the data as a training set
 (def shuffled-spambase (shuffle spambase-table))
-(def train-set (unsafe-unbox
-                (take 460 shuffled-spambase)))
-(def test-set (unsafe-unbox
-               (drop 460 shuffled-spambase)))
+(def train-set (take 460 shuffled-spambase))
+(def test-set (drop 460 shuffled-spambase))
 
 (def feature-means
   (fl/ (exact->inexact (foldr + 0 (#r(1)curtail train-set)))

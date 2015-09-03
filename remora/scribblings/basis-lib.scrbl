@@ -129,10 +129,11 @@ Right-associative fold over @code[#:lang "remora/dynamic"]{x} using
 the base case.
 }
 
-@defproc[(reduce [op 'all] [x 'all]) ★]{
+@defproc[(reduce [op 'all] [base 'all] [x 'all]) ★]{
 Tree-shaped reduction of @code[#:lang "remora/dynamic"]{x} using
-@code[#:lang "remora/dynamic"]{op}. Requires at least one item in
-@code[#:lang "remora/dynamic"]{x} and should not be used if
+@code[#:lang "remora/dynamic"]{op}. If @code[#:lang "remora/dynamic"]{x} has
+length @code[#:lang "remora/dynamic"]{0}, returns
+@code[#:lang "remora/dynamic"]{base}. Should not be used if
 @code[#:lang "remora/dynamic"]{op} is not associative.
 }
 

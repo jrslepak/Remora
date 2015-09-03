@@ -8,7 +8,7 @@
 ;;; XCR shivers: tally -> length
 ;;; jrslepak: renamed operator
 (def (mean (samples 1))
-  (/ (foldr + 0 samples)
+  (/ (reduce + 0 samples)
      (length samples)))
 
 
@@ -80,7 +80,7 @@
   (- (tail win)
      (* (head win) (exp (- 0 (* 2 (* pi (* 0+i freq))))))))
 (def (goertzel-fir (freq 0) (post-iir 1))
-  (goertzel-fir-step freq (unsafe-unbox (take-right 2 post-iir))))
+  (goertzel-fir-step freq (take-right 2 post-iir)))
 (def (goertzel (freq 0) (signal 1))
   ;; magnitude must be scaled down by half the buffer length
   ;; result phase is how far from 0 (i.e., 2π) the buffer's last sample is
@@ -97,7 +97,7 @@
 ;;; The "bar" for each number is a sequence of #t, followed by as many #f as
 ;;; needed to fill the remaining space.
 (def (histogram (vec 1))
-  (unbox count (iota [(inexact->exact (foldr max -inf.0 vec))])
+  (unbox count (iota [(inexact->exact (reduce max -inf.0 vec))])
     (box (#r(0 1)>= vec (add1 count)))))
 
 
