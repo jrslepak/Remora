@@ -217,7 +217,14 @@ Read an array from the designated input port.
 
 @defproc[(filter [bools 1] [x 'all]) ★]{
 Keep or discard each item of @code[#:lang "remora/dynamic"]{x} according to the
-corresponding element of @code[#:lang "remora/dynamic"]{bools}.
+corresponding element of @code[#:lang "remora/dynamic"]{bools}. Not safe for
+lifting on the @code[#:lang "remora/dynamic"]{bools} argument.
+}
+
+@defproc[(filter* [bools 1] [x 'all]) ★]{
+Like @code[#:lang "remora/dynamic"]{filter}, but with a
+@code[#:lang "remora/dynamic"]{box}ed result to allow lifting on
+@code[#:lang "remora/dynamic"]{bools}.
 }
 
 @defproc[(window [l 0] [x 'all]) ★]{
