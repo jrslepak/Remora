@@ -41,13 +41,13 @@ Logarithm of @racket[x] with base 2}
 Extract the first item of @racket[x]}
 
 @defproc[(behead [x 'all]) ★]{
-Remora the first item of @racket[x]}
+Remove the first item of @racket[x]}
 
 @defproc[(tail [x 'all]) ★]{
 Extract the last item of @racket[x]}
 
 @defproc[(curtail [x 'all]) ★]{
-Remora the last item of @racket[x]}
+Remove the last item of @racket[x]}
 
 @defproc[(take [n 0] [x 'all]) ★]{
 Extract the first @racket[n] items of @racket[x]}
