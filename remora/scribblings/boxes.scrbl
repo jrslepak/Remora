@@ -1,12 +1,6 @@
 #lang scribble/manual
-@require[(for-label #;(except-in racket/base
-                               box unbox
-                               #%module-begin
-                               #%top-interaction)
-                    remora/dynamic/main
-                    #;remora/dynamic)]
+@require[(for-label remora/dynamic)]
 
-@;defmodulelang[remora/dynamic]
 @declare-exporting[remora/dynamic/main]
 @title{Boxes: handling irregular data}
 

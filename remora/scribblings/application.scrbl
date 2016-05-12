@@ -1,10 +1,9 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
                                box unbox)
-                    remora/dynamic/main)]
+                    remora/dynamic)]
 
-@;defmodulelang[remora/dynamic]
-@declare-exporting[remora/dynamic/main]
+@declare-exporting[remora/dynamic]
 
 @title{Function Application}
 

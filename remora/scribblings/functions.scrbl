@@ -1,10 +1,9 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
                                box unbox)
-                    remora/dynamic/main)]
+                    remora/dynamic)]
 
-@;defmodulelang[remora/dynamic]
-@declare-exporting[remora/dynamic/main]
+@declare-exporting[remora/dynamic]
 @title{Functions}
 
 @defform[(fn ((id rank) ...) body ...+)]{
@@ -23,4 +22,9 @@ The result of the final expression is returned as the result of the function.
 Functions are atoms, so a @racket[fn] form can be used as an element of an
 @racket[alit] form or in expression position where it will be converted to a
 rank 0 array.
+
+}
+@defidform[all]{
+Rank annotation for an argument which should be treated as a single cell,
+regardless of the actual argument's shape.
 }

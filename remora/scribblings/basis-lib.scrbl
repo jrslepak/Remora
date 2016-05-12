@@ -1,17 +1,7 @@
 #lang scribble/manual
-@require[(for-label remora/dynamic/lang/language
-                    #;remora/dynamic)]
-@declare-exporting[remora/dynamic/lang/language]
-@;defmodule[remora/dynamic/lang/language]
+@require[(for-label remora/dynamic)]
+@declare-exporting[remora/dynamic]
 @title{Built-in functions}
-
-@;{
-@defproc[(id [x 'all]) ★]{Identity function}
-@defproc[(+ [x 0] [y 0]) 0]{Addition}
-@defproc[(- [x 0] [y 0]) 0]{Subtraction}
-@defproc[(* [x 0] [y 0]) 0]{Multiplication}
-@defproc[(/ [x 0] [y 0]) 0]{Division}
-}
 
 @defproc[(and [x 0] [y 0]) 0]{Logical And}
 @defproc[(or [x 0] [y 0]) 0]{Logical Or}

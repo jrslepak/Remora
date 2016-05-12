@@ -2,7 +2,6 @@
 @require[(for-label (except-in racket/base
                                box unbox)
                     remora/dynamic/main)]
-@;@defmodulelang[remora/dynamic]
 @declare-exporting[remora/dynamic/main]
 @title{Arrays}
 
@@ -10,12 +9,13 @@ All computation in array-oriented programming is performed on arrays. An array
 is a collection of ``atoms'' arranged in a rectangular, or ``regular'', layout.
 Atoms are basic data such as numbers, strings, and booleans.
 
-An array can have any natural number of axes. This number is called the array's
-``rank.'' A vector extends along only one axis, so it is a rank 1 array. A
-matrix has two axes, making it a rank 2 array. This rule generalizes to
-higher-rank structures, though they do not have common names. The degenerate
-case of an array has zero axes---a scalar has rank 0 (note: a scalar contains
-one atom, but an atom is not itself a scalar).
+An array can have any natural number of @tech[#:key "axis" #:normalize? #f]{axes}.
+This number is called the array's ``rank.''
+A vector extends along only one axis, so it is a rank 1 array.
+A matrix has two axes, making it a rank 2 array.
+This rule generalizes to higher-rank structures, though they do not have common names.
+The degenerate case of an array has zero axes---a scalar has rank 0
+(note: a scalar contains one atom, but an atom is not itself a scalar).
 
 The ``shape'' of an array is a sequence whose elements gives the array's size
 along each axis. For example, a 4 × 7 matrix (4 rows, 7 columns) has shape

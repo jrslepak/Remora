@@ -3,9 +3,7 @@
          scribble/core
          racket/sandbox
          remora/dynamic/lang/reader
-         (for-label remora/dynamic/lang/language
-                    #;remora/dynamic)]
-@defmodulelang[remora/dynamic]
+         (for-label remora/dynamic)]
 
 @title[#:version "" #:date ""]{Remora Tutorial}
 
@@ -139,8 +137,9 @@ In our vector-and-scalars expression,
 the @tech{frames} are @code[#:lang "remora/dynamic"]{[]},
 @code[#:lang "remora/dynamic"]{[3]}, and @code[#:lang "remora/dynamic"]{[]}.
 They're not all the same, but they're close enough:
-We can add extra axes at the right ends of lower-@tech{rank}ed @tech{frames} in
-order to make them the same as the highest-@tech{rank}ed @tech{frame}.
+We can add extra @tech[#:key "axis" #:normalize? #f]{axes}
+at the right ends of lower-@tech{rank}ed @tech{frames}
+in order to make them the same as the highest-@tech{rank}ed @tech{frame}.
 Adding more axes to an array means its @tech{cells} get replicated too:
 @code[#:lang "remora/dynamic"]{+} becomes
 @code[#:lang "remora/dynamic"]{[+ + +]}, and @code[#:lang "remora/dynamic"]{3}
@@ -179,7 +178,7 @@ and
 }
 
 We effectively treated @code[#:lang "remora/dynamic"]{[10 20]} as a column by
-adding another @tech{axis} to its shape after the
+adding another @tech[#:normalize? #f]{axis} to its shape after the
 @code[#:lang "remora/dynamic"]{2}.
 Not all operations behave like @code[#:lang "remora/dynamic"]{+} in this regard.
 The @code[#:lang "remora/dynamic"]{base} operator interprets a vector of digits
@@ -204,8 +203,8 @@ and with @code[#:lang "remora/dynamic"]{base}, the @tech{cells} are vectors:
 @racket[#,(racketresultfont (tt "[183 3274]"))]}
 The @tech{frames} are @code[#:lang "remora/dynamic"]{[]},
 @code[#:lang "remora/dynamic"]{[2]}, and @code[#:lang "remora/dynamic"]{[]}.
-The last axis of each argument is the shape of its @tech{rank}-1
-@techlink{cells}.
+The last @tech[#:normalize? #f]{axis} of each argument is the shape of its
+@tech{rank}-1 @techlink{cells}.
 
 Expanding the second argument's frame to match the first makes it a
 @code[#:lang "remora/dynamic"]{[2]} frame of @code[#:lang "remora/dynamic"]{[3]}
@@ -306,7 +305,7 @@ They have expected rank @code[#:lang "remora/dynamic"]{all}, meaning the
 argument is always considered to have a scalar frame.
 One such function is @code[#:lang "remora/dynamic"]{head}.
 It extracts the first @deftech{item}, that is a sub-array with one less
-@tech{axis}.
+@tech[#:normalize? #f]{axis}.
 @nested[#:style 'code-inset]{
 @racketinput0[(head [0 1 2 3])]
 @racket[#,(racketresultfont (tt "0"))]}
@@ -332,7 +331,7 @@ first element of each row, that is of each rank-1 cell.
 
 Another @code[#:lang "remora/dynamic"]{all}-ranked function is
 @code[#:lang "remora/dynamic"]{append}, which joins two arrays along their major
-axis.
+@tech[#:normalize? #f]{axis}.
 @nested[#:style 'code-inset]{
 @racketinput0[(append [[0 1] [2 3]] [[10 20] [30 40]])]
 @racket[#,(racketresultfont (tt "[[0 1] [2 3] [10 20] [30 40]]"))]}
@@ -342,7 +341,7 @@ axis.
 @racket[#,(racketresultfont (tt "[0 1 2 3]"))]}
 
 Reranking @code[#:lang "remora/dynamic"]{append} lets us join arrays along a
-different axis:
+different @tech[#:normalize? #f]{axis}:
 @nested[#:style 'code-inset]{
 @racketinput0[#,(code #:lang "remora/dynamic"
                       "(#r(1 1)append [[0 1] [2 3]] [[10 20] [30 40]])")]
@@ -366,7 +365,7 @@ If we apply such a function to a multi-celled array, we could get result cells
 with differing shapes.
 We can't put those together in a single array.
 There is no valid shape that describes that array.
-An array can only have one size along each axis.
+An array can only have one size along each @tech[#:normalize? #f]{axis}.
 
 In order to make such functions safe to use on higher-ranked arguments, they
 produce @deftech{boxes}.
