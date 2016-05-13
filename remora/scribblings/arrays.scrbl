@@ -1,6 +1,8 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
-                               box unbox)
+                               box unbox define λ)
+                    (only-in remora/dynamic/lang/language
+                             define λ)
                     remora/dynamic/main)]
 @declare-exporting[remora/dynamic/main]
 @title{Arrays}
@@ -73,11 +75,15 @@ In @tt{#lang remora/dynamic}, @tt{[expr ...]} is read as
 @racket[(array expr ...)]
 }
 
-@defform[(def id expr)]{
+@defform[(define id expr)]{
 Definition form: binds @racket[id] to the result of @code{expr}. Recall that
-expressions produce arrays, so @code{(def x 3)} binds @code{x} to the scalar
+expressions produce arrays, so @code{(define x 3)} binds @code{x} to the scalar
 @code[#:lang "remora/dynamic"]{#A()(3)}, not the atom 3. Therefore
 @code[#:lang "remora/dynamic"]{[x x]} produces
 @code[#:lang "remora/dynamic"]{#A(2)(3 3)}, and
 @code[#:lang "remora/dynamic"]{#A(2)(x x)} is not permitted.
+}
+@defform[(def id expr)]{
+Like @racket[define], but available in library mode,
+to avoid shadowing issues with the "ambient" language.
 }

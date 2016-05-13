@@ -1,6 +1,8 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
-                               box unbox)
+                               box unbox define λ)
+                    (only-in remora/dynamic/lang/language
+                             define λ)
                     remora/dynamic)]
 
 @declare-exporting[remora/dynamic]
@@ -176,14 +178,14 @@ rank 1 arguments instead of rank 0.
 We can write such a function:
 @codeblock[#:keep-lang-line? #f]{
 #lang remora/dynamic
-(fn ((x 1) (y 1)) (+ x y))
+(λ ((x 1) (y 1)) (+ x y))
 }
 
 This is common enough to warrant its own syntactic sugar:
 
 @defform[(rerank (rank ...) expr)]{
 Wrap a function in a function of different rank.
-Equivalent to @code[#:lang "remora/dynamic"]{(fn ((x rank) ...) (expr x ...))}
+Equivalent to @code[#:lang "remora/dynamic"]{(λ ((x rank) ...) (expr x ...))}
 with fresh variables @code[#:lang "remora/dynamic"]{x ...}.
 This causes the function produced by evaluating
 @code[#:lang "remora/dynamic"]{expr} to be lifted using the expected argument

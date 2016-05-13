@@ -93,8 +93,11 @@
                             (regexp-replace #rx"^R_" name "")
                             name))
                       (all-from-out "basis-lib.rkt"))
+                     define λ
                      #%module-begin
-                     #%top-interaction))
+                     #%top-interaction)
+         (rename-out [def define]
+                     [fn λ]))
 
 (current-read-interaction READER_remora-read-syntax)
 

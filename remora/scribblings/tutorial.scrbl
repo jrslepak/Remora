@@ -3,7 +3,9 @@
          scribble/core
          racket/sandbox
          remora/dynamic/lang/reader
-         (for-label remora/dynamic)]
+         (for-label remora/dynamic
+                    (only-in remora/dynamic/lang/language
+                             define λ))]
 
 @title[#:version "" #:date ""]{Remora Tutorial}
 
@@ -218,7 +220,7 @@ We need a function which expects @tech{rank}-1 arguments and adds them.
 A function is written like this:
 @codeblock[#:keep-lang-line? #f]{
 #lang remora/dynamic
-(fn ((x 1) (y 1)) (+ x y))
+(λ ((x 1) (y 1)) (+ x y))
 }
 
 @code[#:lang "remora/dynamic"]{x} and @code[#:lang "remora/dynamic"]{y} are the
@@ -234,7 +236,7 @@ always refer to rank-1 cells of those arguments.
 For convenience, we'll give this function a name:
 @codeblock[#:keep-lang-line? #f]{
 #lang remora/dynamic
-(def vec+ (fn ((x 1) (y 1)) (+ x y)))
+(def vec+ (λ ((x 1) (y 1)) (+ x y)))
 }
 The @code[#:lang "remora/dynamic"]{def} form takes a name and an expression and
 binds the name to the result of that expression.
@@ -405,7 +407,7 @@ without boxing it.
 This means we could write a factorial function:
 @codeblock[#:keep-lang-line? #f]{
 #lang remora/dynamic
-(fn ((n 0))
+(λ ((n 0))
   (unbox nats (iota [n])
     (foldr * 1 (add1 nats))))
 }

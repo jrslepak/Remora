@@ -1,6 +1,8 @@
 #lang scribble/manual
 @require[(for-label (except-in racket/base
-                               box unbox)
+                               box unbox define λ)
+                    (only-in remora/dynamic/lang/language
+                             define λ)
                     (lib "remora/dynamic"))]
 
 @title[#:tag '("rackmora"

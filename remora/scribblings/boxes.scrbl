@@ -37,7 +37,7 @@ We can use this to write a function which finds the mean of a boxed vector:
 @codeblock[#:keep-lang-line? #f]{
 #lang remora/dynamic
 (def box-mean
-  (fn ((some-box 0))
+  (λ ((some-box 0))
     (unbox xs some-box
       (/ (foldr + 0 xs)
          (tally xs)))))

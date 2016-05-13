@@ -1,4 +1,5 @@
 #lang racket/base
+;;; Environment setup for Remora-as-a-library
 (require "lang/syntax.rkt"
          "lang/basis-lib.rkt"
          "lang/semantics.rkt"
