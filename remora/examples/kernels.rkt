@@ -110,20 +110,29 @@
                        (add1 count))))))
 
 ;;; Drop leading spaces from a character vector
-(def (drop-leading-space (str 1))
+(def (drop-leading-space-vec (str 1))
   (filter (behead (scan or #f (not (equal? #\space str))))
           str))
 
+(def (drop-leading-space (str 0))
+  (array->string (drop-leading-space-vec (string->array str))))
+
 ;;; Drop trailing spaces from a character vector
-(def (drop-trailing-space (str 1))
+(def (drop-trailing-space-vec (str 1))
   (filter (reverse (behead (scan or #f (not (equal? #\space (reverse str))))))
           str))
 
+(def (drop-trailing-space (str 0))
+  (array->string (drop-trailing-space-vec (string->array str))))
+
 ;;; Collapse multiple consecutive spaces to a single space
-(def (collapse-multiple-space (str 1))
+(def (collapse-multiple-space-vec (str 1))
   (filter (or (not (equal? #\space str))
               (behead (rotate (append [#t] (not (equal? #\space str))) 1)))
           str))
+
+(def (collapse-multiple-space (str 0))
+  (array->string (collapse-multiple-space-vec (string->array str))))
 
 ;;; Determine how many decimal digits are needed to represent a positive number
 (def (num-digits (num 0))
