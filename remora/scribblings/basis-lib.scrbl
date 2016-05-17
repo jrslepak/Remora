@@ -26,6 +26,12 @@ Logarithm of @racket[x] with base 10}
 @defproc[(lg [x 0]) 0]{
 Logarithm of @racket[x] with base 2}
 
+@defproc[(string->array [s 0]) 1]{
+Representation of @racket[s] as a character vector}
+
+@defproc[(array->string [x 1]) 0]{
+String representation of character vector @racket[x]}
+
 @;{TODO: define "item" earlier in the tutorial, make uses of it link there}
 @defproc[(head [x 'all]) ★]{
 Extract the first item of @racket[x]}
