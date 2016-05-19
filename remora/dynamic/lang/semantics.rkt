@@ -441,12 +441,17 @@
  (contract-out
   (rem-scalar-proc (-> procedure? exact-nonnegative-integer? rem-proc?))))
 (define (rem-scalar-proc p arity)
+  ;; Cache the result of the application of the remora function, then
+  ;; check if it's already been wrapped as a rem-array. If it has, then
+  ;; return it, otherwise wrap it as it currently is
   (rem-proc (λ args
-              (rem-array
-               #()
-               (vector-immutable
-                (apply p (for/list [(a args)]
-                           (vector-ref (rem-array-data a) 0))))))
+              (let [(result (apply p (for/list [(a args)]
+                                       (vector-ref (rem-array-data a) 0))))]
+                (if (rem-array? result)
+                  result
+                  (rem-array
+                   #()
+                   (vector-immutable result)))))
             (for/list [(i arity)] 0)))
 
 ;;; Build a scalar Remora array from a Racket value
