@@ -3,13 +3,13 @@
 ;;; a simple yet naieve low pass filter
 ;;; y(n) = x(n) + x(n - 1)
 (define (simple-low-pass (seed 0) (data 1))
-  (define lpblock (curtail (append [0] (rotate data 1))))
+  (define lpblock (append (curtail (rotate data 1)) [0]))
   (+ data lpblock))
 
 ;;; a simple yet naieve high pass filter
 ;;; y(n) = x(n) - x(n - 1)
 (define (simple-high-pass (seed 0) (data 1))
-  (define hpblock (curtail (append [0] (rotate data 1))))
+  (define hpblock (append (curtail (rotate data 1)) [0]))
   (- data hpblock))
 
 ;;; a more reasonable low pass filter
