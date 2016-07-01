@@ -86,29 +86,3 @@
   ;; result phase is how far from 0 (i.e., 2π) the buffer's last sample is
   (/ (goertzel-fir freq (goertzel-iir freq signal))
      (/ (length signal) 2)))
-
-
-
-
-;;;-------------------------------------
-;;; Translated Perlis idioms
-;;;-------------------------------------
-;;; Construct a histogram of a vector of naturals
-;;; The "bar" for each number is a sequence of #t, followed by as many #f as
-;;; needed to fill the remaining space.
-(def (histogram (vec 1))
-  (unbox count (iota [(inexact->exact (reduce max -inf.0 vec))])
-    (box (#r(0 1)>= vec (add1 count)))))
-
-
-;;; Construct boxed vector of integers counting from left to right, either up
-;;; or down as needed.
-(def (range (left 0) (right 0))
-  (unbox count (iota [(abs (- right left))])
-    (append [left]
-            (+ left (* (signum (- right left))
-                       (add1 count))))))
-
-;;; Determine how many decimal digits are needed to represent a positive number
-(def (num-digits (num 0))
-  (floor (add1 (log num))))

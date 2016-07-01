@@ -109,4 +109,3 @@
 (def (num-digits (num 0))
   (floor (add1 (log num))))
 
-
