@@ -82,10 +82,11 @@
   (define y (matrix-transpose x))
   (list x y))
 
+;;; indices for a truth table of size n by n
+(define (truth-indices (n 0))
+  (reshape (append (reshape [n] 2) [n]) (antibase (reshape [n] 2) (iota [(expt n 2)]))))
 
-
-
-  
-  
-  
+;;; a truth table of order n of function f
+(define (truth-table (f all) (n 0))
+  (#r(1)f (int->bool (truth-indices n))))
 
