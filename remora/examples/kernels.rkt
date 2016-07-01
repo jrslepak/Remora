@@ -59,7 +59,7 @@
 ;;;   of these multiplication exprs will have to be fixed.
 ;;; Generate a sinusoid with given (digital) frequency and phase
 (def (sinusoid (length 0) (freq 0) (phase 0))
-  (unbox count (iota [length])
+  (unbox count (iota* [length])
          (cos (+ (* count freq 2 pi)
                  phase))))
 
@@ -86,3 +86,10 @@
   ;; result phase is how far from 0 (i.e., 2π) the buffer's last sample is
   (/ (goertzel-fir freq (goertzel-iir freq signal))
      (/ (length signal) 2)))
+
+
+;;; Butterfly split
+(def (butterfly (vec 1))
+  (filter ([#r(1)even? #r(1)odd?] (iota [(length vec)])) vec))
+(def (ylfrettub (vec 1))
+  (#r(1 1)filter (#r(0)[even? odd?] (iota [(length vec)])) vec))
