@@ -546,8 +546,7 @@
         (define shift-atom (vector-ref (rem-array-data shift) 0))
         (define actual-shift
           (cond [(equal? 0 shift-atom) 0]
-                [(negative? shift-atom) (+ (length cells)
-                                           (modulo shift-atom (length cells)))]
+                [(negative? shift-atom) (modulo shift-atom (length cells))]
                 [else (modulo shift-atom (length cells))]))
         (cell-list->array (append (drop cells actual-shift)
                                   (take cells actual-shift))
