@@ -82,7 +82,7 @@
 (define (position-matrix (n 0))
   (define x (reshape [n n] (iota [n])))
   (define y (matrix-transpose x))
-  (list x y))
+  (#r(0 0)array x y))
 
 ;;; indices for a truth table of size n by n
 (define (truth-indices (n 0))
