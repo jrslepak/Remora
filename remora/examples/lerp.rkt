@@ -1,5 +1,7 @@
 #lang remora/dynamic
 
+(provide lerp)
+
 ;;; Defining and using a function
 
 ;;; find the number part way between two boundaries

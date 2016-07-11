@@ -2,6 +2,8 @@
 
 (require racket/function)
 
+(provide (all-defined-out))
+
 ;;; An implementation of some sample items from the APL idioms list in Remora
 
 ;;; Drop leading spaces from a character vector

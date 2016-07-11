@@ -1,5 +1,9 @@
 #lang remora/dynamic
 
+(require racket/math)
+(require "idioms.rkt")
+(require "kernels.rkt")
+
 ;;; a simple yet naieve low pass filter
 ;;; y(n) = x(n) + x(n - 1)
 (define (simple-low-pass (seed 0) (data 1))
