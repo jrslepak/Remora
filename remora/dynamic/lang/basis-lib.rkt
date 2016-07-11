@@ -555,6 +555,8 @@
 (module+ test
   (check-equal? (remora (R_rotate (array 1 2 3 4 5) 1))
                 (remora (array 2 3 4 5 1)))
+  (check-equal? (remora (R_rotate (array 1 2 3 4 5) -1))
+                (remora (array 5 1 2 3 4)))
   (check-equal? (remora (R_rotate (array (array 0 1)
                                          (array 2 3)
                                          (array 4 5))
