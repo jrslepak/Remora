@@ -2,6 +2,8 @@
 
 (require racket/function)
 
+(provide (all-defined-out))
+
 ;;; An implementation of some sample items from the APL idioms list in Remora
 
 ;;; Drop leading spaces from a character vector
@@ -80,7 +82,7 @@
 (define (position-matrix (n 0))
   (define x (reshape [n n] (iota [n])))
   (define y (matrix-transpose x))
-  (list x y))
+  (#r(0 0)array x y))
 
 ;;; indices for a truth table of size n by n
 (define (truth-indices (n 0))

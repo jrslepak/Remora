@@ -2,6 +2,9 @@
 (require racket/math
          (only-in racket/list first second))
 
+(provide dtmf-encode)
+(provide dtmf-decode)
+
 ;;; Frequency associated with the row each key appears in
 (def row-freqs
   (array (list #\1 697) (list #\2 697) (list #\3 697) (list #\A 697)
