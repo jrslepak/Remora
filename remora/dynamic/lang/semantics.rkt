@@ -22,7 +22,7 @@
                                (vectorof exact-nonnegative-integer?)))
                         #:rest
                         (listof rem-array?)
-                        rem-array?))))
+                        (or/c rem-array? rem-box?)))))
 (define (apply-rem-array fun
                          #:result-shape [result-shape 'no-annotation]
                          . args)
@@ -520,7 +520,7 @@
                                     (vectorof exact-nonnegative-integer?)))
                              #:rest
                              (listof (or/c rem-array? rem-box?))
-                             rem-array?))))
+                             (or/c rem-array? rem-box?)))))
 (define (remora-apply
          fun
          #:result-shape [result-shape 'no-annotation]
