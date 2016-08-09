@@ -1,5 +1,9 @@
 #lang remora/dynamic
 
+(require racket/math)
+(require "idioms.rkt")
+(require "kernels.rkt")
+
 ;;; a simple yet naieve low pass filter
 ;;; y(n) = x(n) + x(n - 1)
 (define (simple-low-pass (seed 0) (data 1))
@@ -31,3 +35,18 @@
     (define ny (* alpha (- (+ ly x) lx)))
     (append [[x ny]] acc))
   (curtail (#r(1)tail (foldr hp-step [(reshape [2] seed)] data))))
+
+;;; general FIR filter
+;;; y(n) = sum k=0 -> M - 1 of h(k) * x(n - k)
+
+(define (dot (a all) (b all))
+  (foldr + 0 (* a b)))
+
+;;; general FIR filter
+(define (fir-filter (coeffs 1) (data 1))
+  (dot coeffs (rotate data (iota [(length coeffs)]))))
+
+;;; DFT
+(define (dft-angles (len 0))
+  (define transforms (position-matrix len))
+  (/ (* 2 pi (#r(1)head transforms) (#r(1)tail transforms)) len))
