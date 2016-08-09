@@ -491,23 +491,29 @@
   (check-true (regular-list? '(((a b c)(a b c))((a b c)(a b c)))))
   (check-false (regular-list? '(((a b c)(a b))((a b c)(a b c))))))
 
-;;; Build a nested Racket list from a Remora array
-;;; Note: in the rank 0 case, you may not get a list
+;;; Build a nested Racket list or vector from a Remora array
+;;; Note: in the rank 0 case, you may not get a list/vector
 (provide
  (contract-out
-  (array->nest (-> rem-array? any/c))))
-(define (array->nest xs)
+  (array->nest-list (-> rem-array? any/c))
+  (array->nest-vector (-> rem-array? any/c))))
+(define (array->nest-list xs)
   (cond [(= 0 (rem-array-rank xs)) (scalar->atom xs)]
         [else (for/list ([item (-1-cells xs)])
-                (array->nest item))]))
+                (array->nest-list item))]))
+(define (array->nest-vector xs)
+  (cond [(= 0 (rem-array-rank xs)) (scalar->atom xs)]
+        [else (for/vector ([item (-1-cells xs)])
+                (array->nest-vector item))]))
 (module+ test
-  (check-equal? (array->nest (rem-array #() #(a)))
+  ;; TODO: test array->nest-vector
+  (check-equal? (array->nest-list (rem-array #() #(a)))
                 'a)
-  (check-equal? (array->nest (rem-array #(3) #(a b c)))
+  (check-equal? (array->nest-list (rem-array #(3) #(a b c)))
                 '(a b c))
-  (check-equal? (array->nest (rem-array #(3 2) #(a b c d e f)))
+  (check-equal? (array->nest-list (rem-array #(3 2) #(a b c d e f)))
                 '((a b) (c d) (e f)))
-  (check-equal? (array->nest (rem-array #(2 3) #(a b c d e f)))
+  (check-equal? (array->nest-list (rem-array #(2 3) #(a b c d e f)))
                 '((a b c) (d e f))))
 
 

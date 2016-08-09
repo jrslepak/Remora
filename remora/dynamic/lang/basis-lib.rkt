@@ -1021,30 +1021,89 @@
         (list->array (scalar->atom lst))))))
 
 ;;; Convert a Remora array to a nested Racket list containing its atoms
-(define R_array->list
+(define R_array->nest-list
   (rem-array
    #()
    (vector
     (Rλ ([arr 'all])
-        #;(printf "got array ~s\n" arr)
-        #;(printf "producing list ~s\n" (array->nest arr))
-        (rem-array #() (vector (array->nest arr)))))))
+        (rem-array #() (vector (array->nest-list arr)))))))
 (module+ test
-  (check-equal? (remora (R_array->list 4))
+  (check-equal? (remora (R_array->nest-list 4))
                 (remora 4))
-  (check-equal? (remora (R_array->list (array 1 2 3 4 5 6)))
+  (check-equal? (remora (R_array->nest-list (array 1 2 3 4 5 6)))
                 (remora '(1 2 3 4 5 6)))
-  (check-equal? (remora (R_array->list (array (array 1 2 3 4 5 6))))
+  (check-equal? (remora (R_array->nest-list (array (array 1 2 3 4 5 6))))
                 (remora '((1 2 3 4 5 6))))
-  (check-equal? (remora (R_array->list (array (array 1 2 3 4 5 6))))
-                (remora '((1 2 3 4 5 6))))
-  (check-equal? (remora (R_array->list (array (array 1 2 3)
+  (check-equal? (remora (R_array->nest-list (array (array 1 2 3)
                                               (array 4 5 6))))
                 (remora '((1 2 3) (4 5 6))))
-  (check-equal? (remora (R_array->list (array (array 1 2)
+  (check-equal? (remora (R_array->nest-list (array (array 1 2)
                                               (array 3 4)
                                               (array 5 6))))
                 (remora '((1 2) (3 4) (5 6)))))
+;;; Convert a Remora array to a nested Racket vector containing its atoms
+(define R_array->nest-vector
+  (rem-array
+   #()
+   (vector
+    (Rλ ([arr 'all])
+        (rem-array #() (vector (array->nest-vector arr)))))))
+(module+ test
+  (check-equal? (remora (R_array->nest-vector 4))
+                (remora 4))
+  (check-equal? (remora (R_array->nest-vector (array 1 2 3 4 5 6)))
+                (remora '#(1 2 3 4 5 6)))
+  (check-equal? (remora (R_array->nest-vector (array (array 1 2 3 4 5 6))))
+                (remora '#(#(1 2 3 4 5 6))))
+  (check-equal? (remora (R_array->nest-vector (array (array 1 2 3)
+                                              (array 4 5 6))))
+                (remora '#(#(1 2 3) #(4 5 6))))
+  (check-equal? (remora (R_array->nest-vector (array (array 1 2)
+                                              (array 3 4)
+                                              (array 5 6))))
+                (remora '#(#(1 2) #(3 4) #(5 6)))))
+;;; Convert a Remora array to a flattened Racket list containing its atoms
+(define R_array->flat-list
+  (rem-array
+   #()
+   (vector
+    (Rλ ([arr 'all])
+        (rem-array #() (vector (vector->list (rem-array-data arr))))))))
+(module+ test
+  (check-equal? (remora (R_array->flat-list 4))
+                (remora '(4)))
+  (check-equal? (remora (R_array->flat-list (array 1 2 3 4 5 6)))
+                (remora '(1 2 3 4 5 6)))
+  (check-equal? (remora (R_array->flat-list (array (array 1 2 3 4 5 6))))
+                (remora '(1 2 3 4 5 6)))
+  (check-equal? (remora (R_array->flat-list (array (array 1 2 3)
+                                                   (array 4 5 6))))
+                (remora '(1 2 3 4 5 6)))
+  (check-equal? (remora (R_array->flat-list (array (array 1 2)
+                                                   (array 3 4)
+                                                   (array 5 6))))
+                (remora '(1 2 3 4 5 6))))
+;;; Convert a Remora array to a flattened Racket vector containing its atoms
+(define R_array->flat-vector
+  (rem-array
+   #()
+   (vector
+    (Rλ ([arr 'all])
+        (rem-array #() (vector (rem-array-data arr)))))))
+(module+ test
+  (check-equal? (remora (R_array->flat-vector 4))
+                (remora '#(4)))
+  (check-equal? (remora (R_array->flat-vector (array 1 2 3 4 5 6)))
+                (remora '#(1 2 3 4 5 6)))
+  (check-equal? (remora (R_array->flat-vector (array (array 1 2 3 4 5 6))))
+                (remora '#(1 2 3 4 5 6)))
+  (check-equal? (remora (R_array->flat-vector (array (array 1 2 3)
+                                                     (array 4 5 6))))
+                (remora '#(1 2 3 4 5 6)))
+  (check-equal? (remora (R_array->flat-vector (array (array 1 2)
+                                                     (array 3 4)
+                                                     (array 5 6))))
+                (remora '#(1 2 3 4 5 6))))
 
 ;;; Convert a Racket string to a Remora vector containing its characters
 (remora (def R_string->array
@@ -1052,7 +1111,7 @@
 
 ;;; Construct a Racket string from a Remora vector of characters
 (remora (def R_array->string
-          (fn ((arr 1)) (list->string (R_array->list arr)))))
+          (fn ((arr 1)) (list->string (R_array->nest-list arr)))))
 
 ;;; Search an associative array (vector of length-2 lists)
 ;;; We won't be able to type this without a cast that effectively assumes at
