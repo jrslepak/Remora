@@ -55,7 +55,7 @@
 
 (define-syntax (Rλ stx)
   (syntax-parse stx
-    [(_ ((var:id rank:expr) ...) body ...+)
+    [(_ ((var:id rank:RANK) ...) body ...+)
     #'(rem-proc (λ (var ...) body ...)
                  (list rank ...))]))
 

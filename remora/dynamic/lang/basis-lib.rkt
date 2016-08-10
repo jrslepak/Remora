@@ -46,7 +46,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
                ;; operates on the -1-cells
                (define cell-shape (vector-drop (rem-array-shape arr) 1))
                (rem-array (vector-drop (rem-array-shape arr) 1)
@@ -68,7 +68,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         ;; operates on the -1-cells
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-array (vector-drop (rem-array-shape arr) 1)
@@ -90,7 +90,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         #;(printf "shape: ~v\ndata: ~v\n"
                   (list->vector
@@ -119,7 +119,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-array (vector-append
                     (vector (sub1 (vector-ref (rem-array-shape arr) 0)))
@@ -142,7 +142,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([n 0] [arr 'all])
+    (Rλ ([n 0] [arr all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-array (vector-append (vector (scalar->atom n)) cell-shape)
                    (vector-take (rem-array-data arr)
@@ -162,7 +162,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([n 0] [arr 'all])
+    (Rλ ([n 0] [arr all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-box
          (rem-array (vector-append (vector (scalar->atom n)) cell-shape)
@@ -184,7 +184,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([n 0] [arr 'all])
+    (Rλ ([n 0] [arr all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-array (vector-append (vector (scalar->atom n)) cell-shape)
                    (vector-take-right (rem-array-data arr)
@@ -204,7 +204,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([n 0] [arr 'all])
+    (Rλ ([n 0] [arr all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-box
          (rem-array (vector-append (vector (scalar->atom n)) cell-shape)
@@ -226,7 +226,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([n 0] [arr 'all])
+    (Rλ ([n 0] [arr all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-array (vector-append
                     (vector (- (vector-ref (rem-array-shape arr) 0)
@@ -248,7 +248,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([n 0] [arr 'all])
+    (Rλ ([n 0] [arr all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-box
          (rem-array (vector-append
@@ -272,7 +272,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([n 0] [arr 'all])
+    (Rλ ([n 0] [arr all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-array (vector-append
                     (vector (- (vector-ref (rem-array-shape arr) 0)
@@ -294,7 +294,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([n 0] [arr 'all])
+    (Rλ ([n 0] [arr all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (rem-box
          (rem-array (vector-append
@@ -356,7 +356,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (define length (vector-ref (rem-array-shape arr) 0))
         (cell-list->array (reverse (array->cell-list arr -1))
                           (vector length)
@@ -375,8 +375,8 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr1 'all]
-         [arr2 'all])
+    (Rλ ([arr1 all]
+         [arr2 all])
         (define cell-shape
           (if (equal? (vector-drop (rem-array-shape arr1) 1)
                       (vector-drop (rem-array-shape arr2) 1))
@@ -408,7 +408,7 @@
    #()
    (vector
     (Rλ ([count 0]
-         [arr 'all])
+         [arr all])
         (define cell-shape (vector-drop (rem-array-shape arr) 1))
         (define cells (array->cell-list arr -1))
         (define shuffled (shuffle cells))
@@ -461,7 +461,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([op 'all] [init 'all] [xs 'all])
+    (Rλ ([op all] [init all] [xs all])
         (define input-items (array->cell-list xs -1))
         #;(printf "input items: ~s\n" input-items)
         (define result-items
@@ -540,7 +540,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all]
+    (Rλ ([arr all]
          [shift 0])
         (define cells (array->cell-list arr -1))
         (define shift-atom (vector-ref (rem-array-data shift) 0))
@@ -581,7 +581,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (rem-array (vector (vector-length (rem-value-shape arr)))
                    (rem-value-shape arr))))))
 (module+ test
@@ -593,7 +593,7 @@
    #()
    (vector
     (Rλ ([new-shape 1]
-         [arr 'all])
+         [arr all])
         (define new-elt-count (for/product ([d (rem-array-data new-shape)]) d))
         (define old-elts (rem-array-data arr))
         (define old-elt-count (vector-length old-elts))
@@ -620,7 +620,7 @@
    #()
    (vector
     (Rλ ([new-shape 1]
-         [arr 'all])
+         [arr all])
         (define new-elt-count (for/product ([d (rem-array-data new-shape)]) d))
         (define old-elts (rem-array-data arr))
         (define old-elt-count (vector-length old-elts))
@@ -704,7 +704,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (define cells
           (list-nub (array->cell-list arr -1)))
         (cell-list->array cells
@@ -733,7 +733,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (define cells
           (list-nub-sieve (array->cell-list arr -1)))
         (rem-array (vector (length cells))
@@ -752,7 +752,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (rem-array (vector (for/product ([d (rem-array-shape arr)]) d))
                    (rem-array-data arr))))))
 (module+ test
@@ -766,7 +766,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (rem-array (vector-append #(1) (rem-array-shape arr))
                    (rem-array-data arr))))))
 (module+ test
@@ -786,7 +786,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (rem-array #() (vector (vector-ref (rem-array-shape arr) 0)))))))
 (module+ test
   (check-equal? (remora (R_length (alit (4 3) 0 1 2 3 4 5 6 7 8 9 10 11)))
@@ -800,7 +800,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([xs 'all] [ys 'all])
+    (Rλ ([xs all] [ys all])
         (rem-array #() (vector (equal? xs ys)))))))
 (module+ test
   (check-equal? (remora (R_equal (array 1 1 1 1) 1))
@@ -816,7 +816,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all]) (rem-array #() (vector (print arr)))))))
+    (Rλ ([arr all]) (rem-array #() (vector (print arr)))))))
 
 ;;; read a whole array structure
 (define R_read
@@ -836,7 +836,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([op 'all] [base 'all] [arr 'all])
+    (Rλ ([op all] [base all] [arr all])
         (rem-foldr op base (array->cell-list arr -1))))))
 (module+ test
   (check-equal? (remora (R_foldr + 0 (array 1 2 3 4)))
@@ -858,7 +858,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([op 'all] [base 'all] [arr 'all])
+    (Rλ ([op all] [base all] [arr all])
         (rem-foldl op base (array->cell-list arr -1))))))
 (module+ test
   (check-equal? (remora (R_foldl + 0 (array 1 2 3 4)))
@@ -881,7 +881,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([op 'all] [base 'all] [arr 'all])
+    (Rλ ([op all] [base all] [arr all])
         (rem-reduce op base (list->vector (array->cell-list arr -1)))))))
 (module+ test
   (check-equal? (remora (R_reduce + 0 (array 1 2 3 4)))
@@ -905,7 +905,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([bools 1] [items 'all])
+    (Rλ ([bools 1] [items all])
         (define cell-shape (vector-drop (rem-array-shape items) 1))
         (define old-cells (array->cell-list items -1))
         (define choices (rem-array-data bools))
@@ -938,7 +938,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([bools 1] [items 'all])
+    (Rλ ([bools 1] [items all])
         (define cell-shape (vector-drop (rem-array-shape items) 1))
         (define old-cells (array->cell-list items -1))
         (define choices (rem-array-data bools))
@@ -973,7 +973,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([bool 0] [a 'all] [b 'all])
+    (Rλ ([bool 0] [a all] [b all])
         (if (scalar->atom bool) a b)))))
 (module+ test
   (check-equal? (remora (R_select #t (array 1 2 3) (array 4 5 6)))
@@ -993,7 +993,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([length 0] [arr 'all])
+    (Rλ ([length 0] [arr all])
         (R_rotate arr (R_iota (R_itemize length)))))))
 (module+ test
   (check-equal? (remora (R_window 3 (array 1 2 3 4 5 6 7 8 9 10)))
@@ -1025,7 +1025,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (rem-array #() (vector (array->nest-list arr)))))))
 (module+ test
   (check-equal? (remora (R_array->nest-list 4))
@@ -1046,7 +1046,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (rem-array #() (vector (array->nest-vector arr)))))))
 (module+ test
   (check-equal? (remora (R_array->nest-vector 4))
@@ -1067,7 +1067,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (rem-array #() (vector (vector->list (rem-array-data arr))))))))
 (module+ test
   (check-equal? (remora (R_array->flat-list 4))
@@ -1088,7 +1088,7 @@
   (rem-array
    #()
    (vector
-    (Rλ ([arr 'all])
+    (Rλ ([arr all])
         (rem-array #() (vector (rem-array-data arr)))))))
 (module+ test
   (check-equal? (remora (R_array->flat-vector 4))
