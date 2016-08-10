@@ -9,6 +9,7 @@
                      racket/syntax))
 
 (provide Rλ
+         define-primop
          remora
          fn
          all
@@ -58,6 +59,12 @@
     [(_ ((var:id rank:RANK) ...) body ...+)
     #'(rem-proc (λ (var ...) body ...)
                  (list rank ...))]))
+(define-syntax (define-primop stx)
+  (syntax-parse stx
+    [(_ (funname:id (var:id rank:RANK) ...) body ...+)
+     #'(define funname
+         (rem-array (vector) (vector (Rλ ((var rank) ...)
+                                         body ...))))]))
 
 (define-syntax (remora? stx)
   (syntax-parse stx
