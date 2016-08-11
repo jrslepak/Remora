@@ -26,6 +26,25 @@ Logarithm of @racket[x] with base 10}
 @defproc[(lg [x 0]) 0]{
 Logarithm of @racket[x] with base 2}
 
+@defproc[(array->flat-list [arr all]) 0]{
+Produce a list of all atoms in an array.}
+
+@defproc[(array->flat-vector [arr all]) 0]{
+Produce a vector of all atoms in an array.}
+
+@defproc[(array->nest-list [arr all]) 0]{
+Produce a nested list representation of an array.
+Each axis is represented by a list nesting level.
+For example, an array with shape @code[#:lang "remora/dynamic"]{[3 2]} becomes
+a length-three list of length-two lists of atoms.
+For a scalar array, the 0-level nested list is just the array's single atom.
+Note that if a 0 appears in an array's shape,
+then lists at the corresponding nesting level will be empty.}
+
+@defproc[(array->nest-vector [arr all]) 0]{
+Like @code[#:lang "remora/dynamic"]{array->nest-list},
+but produces a vector of vectors instead of a list of lists.}
+
 @defproc[(string->array [s 0]) 1]{
 Representation of @racket[s] as a character vector}
 
