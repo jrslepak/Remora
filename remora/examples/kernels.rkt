@@ -93,3 +93,23 @@
   (filter ([#r(1)even? #r(1)odd?] (iota [(length vec)])) vec))
 (def (ylfrettub (vec 1))
   (#r(1 1)filter (#r(0)[even? odd?] (iota [(length vec)])) vec))
+
+;; Take LxM and MxN matrices as input.
+(def (m* (LxM 2) (MxN 2))
+  ;; We build a new-matrix entry by multiplying an m1 row by an m2 column and
+  ;; summing the resulting collection of scalars. Alternatively, view this as
+  ;; collapsing away the second axis of our LxMxN intermediate result.
+  ;; We're sort of abusing the lack of type system here by using scalar 0 as the
+  ;; identity value for reducing a collection of matrices. How to build a
+  ;; properly-shaped all-zero array in the typed setting is left as an exercise
+  ;; for the reader.
+  (#r(all all 2)reduce + 0
+     ;; Take each row of m1, multiply it by the entirety of m2 (rank expansion
+     ;; treats the m1 row as a column vector when lifting to match m2).
+     (#r(1 2)* LxM MxN)))
+;; Example usage:
+#;(m* [[1 2 3]
+       [4 5 6]]
+      [[1 2 3 4]
+       [0 1 0 1]
+       [1 -1 0 0]])
