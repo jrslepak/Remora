@@ -153,5 +153,3 @@
 (define (dft-angles (len 0))
   (define transforms (position-matrix len))
   (/ (* 2 pi (#r(1)head transforms) (#r(1)tail transforms)) len))
-
-;;; FFT, butterfly split, then recur
