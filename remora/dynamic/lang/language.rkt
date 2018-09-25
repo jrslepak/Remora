@@ -93,10 +93,11 @@
                             (regexp-replace #rx"^R_" name "")
                             name))
                       (all-from-out "basis-lib.rkt"))
-                     define λ
+                     define λ struct
                      #%module-begin
                      #%top-interaction)
-         (rename-out [def define]
+         (rename-out [defstruct struct]
+                     [def define]
                      [fn λ]))
 
 (current-read-interaction READER_remora-read-syntax)

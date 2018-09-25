@@ -21,7 +21,8 @@
          unbox
          vec
          rerank
-         def)
+         def
+         defstruct)
 
 
 
@@ -254,8 +255,14 @@
   (syntax-parse stx
     [(_ (funname:id (var:id rank:RANK) ...) body ...+)
      #'(remora (def funname (fn ((var rank) ...) body ...)))]
-    [(_ name defn-or-expr )
+    [(_ name:id defn-or-expr )
      #'(define name (remora defn-or-expr) )]))
+
+;;; (struct name (field ...+))
+(define-remora-syntax (defstruct stx)
+  (syntax-parse stx
+    [(_ structname:id (fieldname:id ...+))
+     #'(struct structname (fieldname ...) #:transparent)]))
 
 #;
 (define-remora-syntax (require stx)
