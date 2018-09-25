@@ -9,6 +9,7 @@ remora/dynamic/lang/language
 (provide remora-readtable
          remora-read
          remora-read-syntax)
+(define original-readtable (current-readtable))
 
 ;;; #A(NAT ...)(ATOM ...)
 ;;;  reads as
@@ -58,7 +59,8 @@ remora/dynamic/lang/language
                      line-num
                      col-num
                      position)
-  (define new-ranks (read port))
+  (define new-ranks (parameterize ([current-readtable original-readtable])
+                      (read port)))
   (define base-exp (read port))
   (list 'rerank new-ranks base-exp))
 
@@ -75,7 +77,8 @@ remora/dynamic/lang/language
    (current-readtable)
    (list #\A 'dispatch-macro read-alit)
    (list #\[ 'terminating-macro read-array)
-   (list #\r 'dispatch-macro read-rerank)))
+   (list #\r 'dispatch-macro read-rerank)
+   (list #\~ 'non-terminating-macro read-rerank)))
 
 (define (remora-read . args)
   (parameterize ([current-readtable remora-readtable])
