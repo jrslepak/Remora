@@ -3,7 +3,8 @@
 (require racket/list
          racket/vector
          racket/sequence
-         racket/contract/base)
+         racket/contract/base
+         racket/string)
 (module+ test
   (require rackunit))
 (define debug-mode (make-parameter #f))
@@ -197,8 +198,66 @@
   (and ((vectorof elts #:flat? #t) vec)
        (equal? (vector-length vec) len)))
 
-;;; String representation of an array, for print, write, or display mode
+;;; Generate a whitespace pad to prepend when pretty-printing
+(define (pad n) (build-string n (λ _ #\space)))
+;;; Generate a flat string representation of a rank-1 array (no line breaks)
+(define (remora-vector->string vec separator [left-col 0])
+  (cond [(= 0 (vector-length (rem-array-data vec))) "[]"]
+        [(for/and ([e (rem-array-data vec)]) (void? e)) ""]
+        ;; May later decide to make char vectors display like strings
+        #;
+        [(for/and ([e (rem-array-data vec)]) (char? e))
+         (apply string (vector->list (rem-array-data vec)))]
+        [else (define atoms
+                (for/list ([a (rem-array-data vec)]) (format "~v" a)))
+              (string-append "[" (string-join atoms separator) "]")]))
+;;; Generate a multi-line representation of a rank-n array
+;;; left-col: tracks how deeply nested the cells we're currently rendering
+;;; are within the array we started with (may start higher than 0 if we're
+;;; nesting this pretty-printed array inside another thing)
+(define (frame->string arr [left-col 0])
+  ;; We only want to place the initial left-pad when we're dealing with the
+  ;; outermost nesting level. Otherwise, the intra-cell padding ensures that we
+  ;; start as far to the right as we should.
+  (define (frame->string* arr left-col start)
+    (string-append
+     (if start (pad left-col) "")
+     (cond
+       ;; For scalar, print its sole atom
+       [(= 0 (rem-array-rank arr))
+        (format "~v" (vector-ref (rem-array-data arr) 0))]
+       ;; For (non-empty) array of #<void>s of any shape, just show nothing
+       [(and (> (vector-length (rem-array-data arr)) 0)
+             (for/and ([e (rem-array-data arr)]) (void? e)))
+        ""]
+       ;; For non-void vectors, use the vector pretty-printer
+       [(and (= 1 (rem-array-rank arr))
+             (for/and ([d (rem-array-data arr)])
+                      (not (rem-box? d))))
+        (remora-vector->string arr " " #;atom-separator)]
+       ;; For higher-rank things, join the cells' string representations with a
+       ;; line break and an amount of space-padding given by nesting depth
+       [else (define cell-strs
+               (for/list ([c (-1-cells arr)])
+                         (frame->string* c (add1 left-col) #f)))
+             (define joined-cells
+               (string-join
+                cell-strs
+                (string-append "\n" (pad (add1 left-col)))))
+             (string-append "[" joined-cells "]")])))
+  (frame->string* arr left-col #t))
+;;; One-line string representation of an array, for print, write, or display mode
 ;;; TODO: consider changing how a vector of characters is represented
+(define (array->string arr [mode 0])
+  (cond [(equal? mode #t)     ; write
+         (format "(rem-array ~s ~s)"
+                 (rem-array-shape arr)
+                 (rem-array-data arr))]
+        [(equal? mode #f)     ; display
+         (frame->string arr)]
+        [(member mode '(0 1)) ; print
+         (frame->string arr)]))
+#;
 (define (array->string arr [mode 0])
   (define format-string
     (cond [(member mode '(0 1)) "~v"] ; print
@@ -220,7 +279,8 @@
                      (string-append str
                                     (if (equal? 0 cell-id) "" " ")
                                     (array->string cell mode)))
-                   "]")])))
+                   "]"
+                   (if (>= (rem-array-rank arr) 2) "\n" ""))])))
 ;;; Print, write, or display an array
 (define (show-array arr [port (current-output-port)] [mode 0])
   (display (array->string arr mode) port))
@@ -344,14 +404,24 @@
 
 
 ;;; A Remora box (dependent sum) has
-;;; - contents, a Remora value
+;;; - contents, a Remora array
 ;;; - indices, a list of the witness indices
-;;; TODO: should this just require contents to be a rem-value? would permit
-;;; box inside another box (allowed in J)
+(define (box->string b mode [left-col 0])
+  (define opener "(box ")
+  (define inset (+ 1 left-col (string-length opener)))
+  (cond [(member mode '(0 1 #f))
+         (string-append opener
+                        (substring (frame->string (rem-box-contents b) inset)
+                                   inset)
+                        ")")]
+        [else (format "(box ~s)" (rem-box-contents b))]))
+(define (show-box b port mode)
+  (display (box->string b mode) port))
 (provide (contract-out
           (struct rem-box ([contents rem-array?]))))
-(define-struct rem-box (contents)
-  #:transparent)
+(struct rem-box (contents)
+  #:transparent
+  #:methods gen:custom-write [(define write-proc show-box)])
 
 ;;; More permissive variants of rem-array functions
 ;;; Find the shape of a Remora value (array or box)
