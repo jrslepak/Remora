@@ -1,6 +1,6 @@
 #lang racket
 
-(require redex
+(require (except-in redex shadow)
          "dependent-lang.rkt"
          "language.rkt"
          "redex-utils.rkt")

@@ -477,7 +477,7 @@
     (idx/type-sub idx-env type_arg) ...)]
   [(idx/expr-sub idx-env (I-APP expr_fun idx_arg ...))
    ((idx/expr-sub idx-env expr_fun)
-    (idx/expr-sub idx-env idx_arg) ...)]
+    (idx/idx-sub idx-env idx_arg) ...)]
   ; dependent sums
   [(idx/expr-sub idx-env (PACK idx ... expr type))
    (PACK (idx/idx-sub idx-env idx) ...
