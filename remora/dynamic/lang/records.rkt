@@ -5,7 +5,7 @@
 (provide (struct-out lrec)
          make-record
          make-lens
-         over view)
+         over view set)
 
 (module+ test
   (require rackunit))
@@ -145,3 +145,26 @@
     NESTED)
    "β"))
 
+;;; Use a lens to replace a field with a passed-in value
+;;; Lens -> B -> [Record over A] -> [Record over B]
+(define ((set l) new-val)
+  ((over l) (const new-val)))
+(module+ test
+  (check-equal?
+   (((set (lens foo)) "eleven") FLAT)
+   ((make-record 'foo 'bar 'baz 'quux)
+    "eleven" 1-3i #t "wut"))
+  (check-equal?
+   (((set (lens foo)) 10) FLAT)
+   ((make-record 'foo 'bar 'baz 'quux)
+    10 1-3i #t "wut"))
+  (check-equal?
+   (((set (lens foo)) #t) NESTED)
+   ((make-record 'foo 'bar 'baz 'quux)
+    #t 1-3i ((make-record 'a 'b) "α" "β") "wut"))
+  (check-equal?
+   (((set (compose (lens baz) (lens a)))
+     "αβγδ")
+    NESTED)
+   ((make-record 'foo 'bar 'baz 'quux)
+    10 1-3i ((make-record 'a 'b) "αβγδ" "β") "wut")))

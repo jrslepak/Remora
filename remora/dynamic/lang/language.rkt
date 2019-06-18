@@ -11,7 +11,7 @@
                   remora-apply
                   racket->remora)
          (only-in "records.rkt"
-                  over view)
+                  over view set)
          #;
          (except-in "semantics.rkt"
                     apply-rem-array
