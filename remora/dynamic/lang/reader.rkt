@@ -89,6 +89,45 @@ remora/dynamic/lang/language
   (define base-exp (read port))
   (list 'rerank new-ranks base-exp))
 
+;;; #_(FIELD ...)
+;;;  reads as
+;;; (view (lens FIELD ...))
+(define (read-view trigger-char
+                   port
+                   source-name
+                   line-num
+                   col-num
+                   position)
+  (define field-names (parameterize ([current-readtable original-readtable])
+                        (read port)))
+  (list 'view (cons 'lens field-names)))
+
+;;; #=(FIELD ...)
+;;;  reads as
+;;; (set (lens FIELD ...))
+(define (read-set trigger-char
+                  port
+                  source-name
+                  line-num
+                  col-num
+                  position)
+  (define field-names (parameterize ([current-readtable original-readtable])
+                        (read port)))
+  (list 'set (cons 'lens field-names)))
+
+;;; #^(FIELD ...)
+;;;  reads as
+;;; (set (lens FIELD ...))
+(define (read-over trigger-char
+                   port
+                   source-name
+                   line-num
+                   col-num
+                   position)
+  (define field-names (parameterize ([current-readtable original-readtable])
+                        (read port)))
+  (list 'over (cons 'lens field-names)))
+
 (define (extend-readtable base-readtable . new-entries)
   (cond [(empty? new-entries) base-readtable]
         [else
@@ -104,7 +143,10 @@ remora/dynamic/lang/language
    (list #\[ 'terminating-macro read-array)
    (list #\{ 'terminating-macro read-record)
    (list #\r 'dispatch-macro read-rerank)
-   (list #\~ 'non-terminating-macro read-rerank)))
+   (list #\~ 'non-terminating-macro read-rerank)
+   (list #\_ 'dispatch-macro read-view)
+   (list #\= 'dispatch-macro read-set)
+   (list #\^ 'dispatch-macro read-over)))
 
 (define (remora-read . args)
   (parameterize ([current-readtable remora-readtable])
