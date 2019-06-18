@@ -25,7 +25,8 @@
          def
          defstruct
          record
-         record-literal)
+         record-literal
+         lens)
 
 
 
@@ -286,6 +287,12 @@
   (syntax-parse stx
     [(_ (fname:id val) ...)
      #'(remora ((record fname ...) val ...))]))
+
+;;; (lens fname) produces a record-building function
+(define-remora-syntax (lens stx)
+  (syntax-parse stx
+    [(_ fname:id ...) #'(racket->remora (compose (make-lens 'fname) ...))]))
+
 
 ;;; sugar for reranking by eta-expansion
 ;;; operates on function arrays (as names only stand for arrays, not functions),

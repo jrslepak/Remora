@@ -10,6 +10,8 @@
                   rem-box
                   remora-apply
                   racket->remora)
+         (only-in "records.rkt"
+                  over view)
          #;
          (except-in "semantics.rkt"
                     apply-rem-array
@@ -72,7 +74,8 @@
 
 (provide (all-from-out "syntax.rkt"
                        "semantics.rkt"
-                       "basis-lib.rkt")
+                       "basis-lib.rkt"
+                       "records.rkt")
          (rename-out [remora-module-begin #%module-begin]
                      [remora-top-interaction #%top-interaction])
          #%racket-module-begin
