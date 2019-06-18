@@ -50,6 +50,31 @@ remora/dynamic/lang/language
       (set! pieces (cons next pieces)))
     pieces))
 
+;;; {FIELD ...}
+;;;  reads as
+;;; (record-lit FIELD ...)
+(define (read-record trigger-char
+                     port
+                     source-name
+                     line-num
+                     col-num
+                     position)
+  (define-struct end-of-form () #:transparent)
+  (define pieces '())
+  (parameterize ([current-readtable
+                  (make-readtable (current-readtable)
+                                  #\}
+                                  'terminating-macro
+                                  (λ args (end-of-form)))])
+    (do ([next (begin #;(displayln "  start loop") (read port))
+               (begin #;(displayln "  step") (read port))])
+      ((equal? next (end-of-form))
+       (set! pieces (cons 'record-literal (reverse pieces)))
+       #;(printf "finishing with \'~v\'" next))
+      #;(printf "got element ~v\n" next)
+      (set! pieces (cons next pieces)))
+    pieces))
+
 ;;; #r(RANK ...)EXP
 ;;;  reads as
 ;;; (rerank (RANK ...) EXP)
@@ -77,6 +102,7 @@ remora/dynamic/lang/language
    (current-readtable)
    (list #\A 'dispatch-macro read-alit)
    (list #\[ 'terminating-macro read-array)
+   (list #\{ 'terminating-macro read-record)
    (list #\r 'dispatch-macro read-rerank)
    (list #\~ 'non-terminating-macro read-rerank)))
 

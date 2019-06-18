@@ -1,6 +1,7 @@
 #lang racket/base
 
-(require "semantics.rkt"
+(require "records.rkt"
+         "semantics.rkt"
          syntax/parse
          (for-syntax syntax/parse
                      (except-in racket/base apply box unbox)
@@ -22,7 +23,9 @@
          vec
          rerank
          def
-         defstruct)
+         defstruct
+         record
+         record-literal)
 
 
 
@@ -273,6 +276,16 @@
   (syntax-parse stx
     [(_ subterm ...) #'(provide subterm ...)]))
 
+;;; (record fname ...) produces a record-building function
+(define-remora-syntax (record stx)
+  (syntax-parse stx
+    [(_ fname:id ...) #'(racket->remora (make-record 'fname ...))]))
+
+;;; (record-lit (fname val) ...) becomes a use of a record-builder
+(define-remora-syntax (record-literal stx)
+  (syntax-parse stx
+    [(_ (fname:id val) ...)
+     #'(remora ((record fname ...) val ...))]))
 
 ;;; sugar for reranking by eta-expansion
 ;;; operates on function arrays (as names only stand for arrays, not functions),
