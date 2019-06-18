@@ -117,7 +117,7 @@ remora/dynamic/lang/language
 
 ;;; #^(FIELD ...)
 ;;;  reads as
-;;; (set (lens FIELD ...))
+;;; (over (lens FIELD ...))
 (define (read-over trigger-char
                    port
                    source-name
