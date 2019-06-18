@@ -36,7 +36,7 @@
   ;; check whether args actually are Remora arrays
   (unless (for/and [(arr args)] (or (rem-array? arr) (rem-box? arr)))
     (error "Remora arrays can only by applied to Remora arrays" fun args))
-  (when (debug-mode) (printf "checked for Remora array arguments\n"))
+  (when (debug-mode) (printf "checked for Remora array arguments in ~v\n" args))
   
   ;; identify expected argument cell ranks
   (define individual-exp-ranks
@@ -339,7 +339,9 @@
 ;;; Apply a Remora procedure (for internal convenience)
 ;;; TODO: consider eliminating this (see note in rem-proc struct defn)
 (define (apply-rem-proc fun . args)
-  (apply (rem-proc-body fun) args))
+  (when (debug-mode) (printf "applying Remora procedure ~v // ~v\n"
+                             fun (rem-proc-ranks fun)))
+  (apply (rem-proc-body fun) (map racket->remora args)))
 
 ;;; A valid expected rank is either a natural number or 'all
 (define (rank? r)
@@ -600,7 +602,8 @@
 (define (remora-apply
          fun
          #:result-shape [result-shape 'no-annotation]
-         . args)
+         . orig-args)
+  (define args (map racket->remora orig-args))
   (cond [(rem-array? fun)
          (apply apply-rem-array
                 (racket-proc-array->rem-proc-array fun (length args))
