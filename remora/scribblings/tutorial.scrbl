@@ -10,7 +10,6 @@
 @title[#:version "" #:date ""]{Remora Tutorial}
 
 @(sandbox-output 'string)
-@(printf "sandbox-output is now ~v\n" (sandbox-output))
 @(define example-evaluator
    (parameterize ([sandbox-output 'string]
                   [sandbox-error-output 'string])
