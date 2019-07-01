@@ -29,10 +29,8 @@
 
 ;;; Split the training set into spam and legit messages
 (def spam? (fn ((message 1)) (= 1 (tail message))))
-(def train-spam (unsafe-unbox (filter (spam? train-set)
-                                      train-set)))
-(def train-legit (unsafe-unbox (filter (not (spam? train-set))
-                                       train-set)))
+(def train-spam (filter (spam? train-set) train-set))
+(def train-legit (filter (not (spam? train-set)) train-set))
 
 ;;; How many spam and legit messages had each feature below and above the mean?
 (def spam-below-mean
@@ -121,7 +119,6 @@
 ;;; (can add a bias to trade sensitivity for specificity or vice versa)
 (def guesses
   (classify (#r(1)curtail test-set)))
-
 
 ;;; Determine which guesses were correct
 (def results

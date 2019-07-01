@@ -40,6 +40,8 @@
   (rem-array #() (vector (rem-scalar-proc (λ (b) (if b 1 0)) 1))))
 
 
+(define-primop (R_box [arr all])
+  (rem-array #() (vector (rem-box arr))))
 
 ;;; "cell-shape" here refers to the -1-cells which will be pushed around
 ;;; "length" is how many -1-cells there are
@@ -135,7 +137,7 @@
                   (array 6 7)))))
 (define-primop (R_take* [n 0] [arr all])
   (define cell-shape (vector-drop (rem-array-shape arr) 1))
-  (rem-box
+  (R_box
    (rem-array (vector-append (vector (scalar->atom n)) cell-shape)
               (vector-take (rem-array-data arr)
                            (* (for/product ([d cell-shape]) d)
@@ -143,13 +145,13 @@
 (module+ test
   (check-equal?
    (remora (R_take* 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
-   (remora (box (array (array 0 1 2)
-                       (array 3 4 5)))))
+   (remora (R_box (array (array 0 1 2)
+                         (array 3 4 5)))))
   (check-equal?
    (remora ((rerank (0 1) R_take*) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
-   (remora (array (box (array 0 1))
-                  (box (array 3 4))
-                  (box (array 6 7))))))
+   (remora (array (R_box (array 0 1))
+                  (R_box (array 3 4))
+                  (R_box (array 6 7))))))
 
 (define-primop (R_take-right [n 0] [arr all])
   (define cell-shape (vector-drop (rem-array-shape arr) 1))
@@ -169,7 +171,7 @@
                   (array 7 8)))))
 (define-primop (R_take-right* [n 0] [arr all])
   (define cell-shape (vector-drop (rem-array-shape arr) 1))
-  (rem-box
+  (R_box
    (rem-array (vector-append (vector (scalar->atom n)) cell-shape)
               (vector-take-right (rem-array-data arr)
                                  (* (for/product ([d cell-shape]) d)
@@ -177,13 +179,13 @@
 (module+ test
   (check-equal?
    (remora (R_take-right* 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
-   (remora (box (array (array 3 4 5)
-                       (array 6 7 8)))))
+   (remora (R_box (array (array 3 4 5)
+                         (array 6 7 8)))))
   (check-equal?
    (remora ((rerank (0 1) R_take-right*) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
-   (remora (array (box (array 1 2))
-                  (box (array 4 5))
-                  (box (array 7 8))))))
+   (remora (array (R_box (array 1 2))
+                  (R_box (array 4 5))
+                  (R_box (array 7 8))))))
 
 (define-primop (R_drop [n 0] [arr all])
   (define cell-shape (vector-drop (rem-array-shape arr) 1))
@@ -205,7 +207,7 @@
                   (array 8)))))
 (define-primop (R_drop* [n 0] [arr all])
   (define cell-shape (vector-drop (rem-array-shape arr) 1))
-  (rem-box
+  (R_box
    (rem-array (vector-append
                (vector (- (vector-ref (rem-array-shape arr) 0)
                           (scalar->atom n)))
@@ -216,12 +218,12 @@
 (module+ test
   (check-equal?
    (remora (R_drop* 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
-   (remora (box (array (array 6 7 8)))))
+   (remora (R_box (array (array 6 7 8)))))
   (check-equal?
    (remora ((rerank (0 1) R_drop*) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
-   (remora (array (box (array 2))
-                  (box (array 5))
-                  (box (array 8))))))
+   (remora (array (R_box (array 2))
+                  (R_box (array 5))
+                  (R_box (array 8))))))
 
 (define-primop (R_drop-right [n 0] [arr all])
   (define cell-shape (vector-drop (rem-array-shape arr) 1))
@@ -243,7 +245,7 @@
                   (array 6)))))
 (define-primop (R_drop-right* [n 0] [arr all])
   (define cell-shape (vector-drop (rem-array-shape arr) 1))
-  (rem-box
+  (R_box
    (rem-array (vector-append
                (vector (- (vector-ref (rem-array-shape arr) 0)
                           (scalar->atom n)))
@@ -254,12 +256,12 @@
 (module+ test
   (check-equal?
    (remora (R_drop-right* 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
-   (remora (box (array (array 0 1 2)))))
+   (remora (R_box (array (array 0 1 2)))))
   (check-equal?
    (remora ((rerank (0 1) R_drop-right*) 2 (alit (3 3) 0 1 2 3 4 5 6 7 8)))
-   (remora (array (box (array 0))
-                  (box (array 3))
-                  (box (array 6))))))
+   (remora (array (R_box (array 0))
+                  (R_box (array 3))
+                  (R_box (array 6))))))
 
 ;;; Split an array into a list of cells of a given rank
 (define (array->cell-list arr cell-rank)
@@ -489,8 +491,8 @@
                                (array 3 4 5 0 1 2)))))
 
 (define-primop (R_shape-of [arr all])
-  (rem-array (vector (vector-length (rem-value-shape arr)))
-             (rem-value-shape arr)))
+  (rem-array (vector (vector-length (rem-array-shape arr)))
+             (rem-array-shape arr)))
 (module+ test
   (check-equal? (remora (R_shape-of (alit (4 1 2) 3 6 2 3 5 2 3 4)))
                 (remora (array 4 1 2))))
@@ -521,7 +523,7 @@
   (define new-elt-count (for/product ([d (rem-array-data new-shape)]) d))
   (define old-elts (rem-array-data arr))
   (define old-elt-count (vector-length old-elts))
-  (rem-box
+  (R_box
    (rem-array
     (rem-array-data new-shape)
     (vector-take
@@ -531,27 +533,27 @@
      new-elt-count))))
 (module+ test
   (check-equal? (remora (R_reshape* (array 3 2)
-                                   (alit (9) 1 2 3 4 5 6 7 8 9)))
-                (remora (box (array (array 1 2)
-                                    (array 3 4)
-                                    (array 5 6)))))
+                                    (alit (9) 1 2 3 4 5 6 7 8 9)))
+                (remora (R_box (array (array 1 2)
+                                      (array 3 4)
+                                      (array 5 6)))))
   (check-equal? (remora (R_reshape* (array 3 2)
-                                   (alit (5) 'a 'b 'c 'd 'e)))
-                (remora (box (array (array 'a 'b)
-                                    (array 'c 'd)
-                                    (array 'e 'a)))))
+                                    (alit (5) 'a 'b 'c 'd 'e)))
+                (remora (R_box (array (array 'a 'b)
+                                      (array 'c 'd)
+                                      (array 'e 'a)))))
   (check-equal? (remora (R_reshape* (array (array 3 2)
-                                          (array 2 3)
-                                          (array 3 3))
-                                   (alit (9) 1 2 3 4 5 6 7 8 9)))
-                (remora (array (box (array (array 1 2)
-                                           (array 3 4)
-                                           (array 5 6)))
-                               (box (array (array 1 2 3)
-                                           (array 4 5 6)))
-                               (box (array (array 1 2 3)
-                                           (array 4 5 6)
-                                           (array 7 8 9)))))))
+                                           (array 2 3)
+                                           (array 3 3))
+                                    (alit (9) 1 2 3 4 5 6 7 8 9)))
+                (remora (array (R_box (array (array 1 2)
+                                             (array 3 4)
+                                             (array 5 6)))
+                               (R_box (array (array 1 2 3)
+                                             (array 4 5 6)))
+                               (R_box (array (array 1 2 3)
+                                             (array 4 5 6)
+                                             (array 7 8 9)))))))
 
 (define-primop (R_iota [shape 1])
   (define size (for/product ([d (rem-array-data shape)]) d))
@@ -567,20 +569,20 @@
                                (array 9 10 11)))))
 (define-primop (R_iota* [shape 1])
   (define size (for/product ([d (rem-array-data shape)]) d))
-  (rem-box (rem-array (rem-array-data shape)
-                      (for/vector ([i size]) i))))
+  (R_box (rem-array (rem-array-data shape)
+                    (for/vector ([i size]) i))))
 (module+ test
   (check-equal? (remora (R_iota* (array 4)))
-                (remora (box (array 0 1 2 3))))
+                (remora (R_box (array 0 1 2 3))))
   (check-equal? (remora (R_iota* (array 4 3)))
-                (remora (box (array (array 0 1 2)
-                                    (array 3 4 5)
-                                    (array 6 7 8)
-                                    (array 9 10 11)))))
+                (remora (R_box (array (array 0 1 2)
+                                      (array 3 4 5)
+                                      (array 6 7 8)
+                                      (array 9 10 11)))))
   (check-equal? (remora (R_iota* (array (array 4)
                                         (array 3))))
-                (remora (array (box (array 0 1 2 3))
-                               (box (array 0 1 2))))))
+                (remora (array (R_box (array 0 1 2 3))
+                               (R_box (array 0 1 2))))))
 
 
 (define (list-nub xs [already-seen '()])
@@ -742,8 +744,8 @@
 ;;; Applying this to an array of boxes risks producing result cells with
 ;;; mismatching shapes.
 (define-primop (R_unsafe-unbox [b 0])
-  (if (rem-box? b)
-      (rem-box-contents b)
+  (if (rem-box? (scalar->atom b))
+      (rem-box-contents (scalar->atom b))
       (printf "oops, b is ~s\n" b)))
 
 
@@ -782,17 +784,17 @@
   (define choices (rem-array-data bools))
   (define new-cells
     (for/list ([b choices] [c old-cells] #:when b) c))
-  (rem-box
+  (R_box
    (cell-list->array new-cells
                      (vector (length new-cells))
                      cell-shape)))
 (module+ test
   (check-equal? (remora (R_filter* (array #t #t #f #t #f #t)
                                    (array 1 2 #t 3 #f 4)))
-                (remora (box (array 1 2 3 4))))
+                (remora (R_box (array 1 2 3 4))))
   (check-equal? (remora (R_filter* (array #f #f #t #f #t #f)
                                    (array 1 2 #t 3 #f 4)))
-                (remora (box (array #t #f))))
+                (remora (R_box (array #t #f))))
   (check-equal? (remora ((rerank (all 1) R_filter)
                          (array #t #f #t)
                          (array (array 1 2 3)
@@ -804,7 +806,7 @@
                                           (array 0 1 3 2)
                                           (array 2 4 5 9)
                                           (array 6 6 6 0))))
-                (remora (box (array (array 1 2 3 0)
+                (remora (R_box (array (array 1 2 3 0)
                                     (array 6 6 6 0))))))
 
 (define-primop (R_select [bool 0] [a all] [b all])

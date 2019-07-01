@@ -23,7 +23,7 @@
                                (vectorof exact-nonnegative-integer?)))
                         #:rest
                         (listof rem-array?)
-                        (or/c rem-array? rem-box?)))))
+                        rem-array?))))
 (define (apply-rem-array fun
                          #:result-shape [result-shape 'no-annotation]
                          . args)
@@ -34,7 +34,7 @@
   (when (debug-mode) (printf "\n\nResult shape is ~v\n" result-shape))
   
   ;; check whether args actually are Remora arrays
-  (unless (for/and [(arr args)] (or (rem-array? arr) (rem-box? arr)))
+  (unless (for/and [(arr args)] (rem-array? arr))
     (error "Remora arrays can only by applied to Remora arrays" fun args))
   (when (debug-mode) (printf "checked for Remora array arguments in ~v\n" args))
   
@@ -46,7 +46,7 @@
                    (arr args)]
         (when (debug-mode) (printf "~v - ~v\n" p t))
         (if (equal? 'all t)
-            (rem-value-rank arr)
+            (rem-array-rank arr)
             t))))
   (when (debug-mode) (printf "individual expected ranks are ~v\n"
                              individual-exp-ranks))
@@ -65,27 +65,27 @@
           ([arr args]
            [r expected-rank])
           (prefix-max 
-           (vector-drop-right (rem-value-shape arr) r)
+           (vector-drop-right (rem-array-shape arr) r)
            max-frame))
         (error "Incompatible argument frames"
-               (cons (rem-value-shape fun)
+               (cons (rem-array-shape fun)
                      (for/list ([arr args]
                                 [r expected-rank])
-                       (vector-drop-right (rem-value-shape arr) r))))))
+                       (vector-drop-right (rem-array-shape arr) r))))))
   (when (debug-mode) (printf "principal-frame = ~v\n" principal-frame))
   
   ;; compute argument cell sizes
   (define cell-sizes
     (for/list ([arr args]
                [r expected-rank])
-      (sequence-fold * 1 (vector-take-right (rem-value-shape arr) r))))
+      (sequence-fold * 1 (vector-take-right (rem-array-shape arr) r))))
   (when (debug-mode) (printf "cell-sizes = ~v\n" cell-sizes))
   
   ;; compute argument frame sizes
   (define frame-sizes
     (for/list ([arr args]
                [r expected-rank])
-      (sequence-fold * 1 (vector-drop-right (rem-value-shape arr) r))))
+      (sequence-fold * 1 (vector-drop-right (rem-array-shape arr) r))))
   (when (debug-mode) (printf "frame-sizes = ~v\n" frame-sizes))
   
   ;; compute each result cell
@@ -114,25 +114,12 @@
             (printf "  arg cell #~v, csize ~v, pfr ~v, fr ~v"
                     cell-id csize (sequence-fold * 1 principal-frame) fsize))
           (define arg-cell
-            (cond
-              ;; if the argument is itself a box, it is its own sole cell
-              [(rem-box? arr)
-               (when (debug-mode) (printf " (argument is a box)"))
-               arr]
-              ;; if we are taking a single box from an array of boxes,
-              ;; the cell is the box, not a scalar wrapper around the box
-              [(and (equal? csize 1)
-                    (rem-box? (vector-ref (rem-value-data arr) offset)))
-               (when (debug-mode) (printf " (cell is a box)"))
-               (vector-ref (rem-value-data arr) offset)]
-              [else
-               (when (debug-mode) (printf " (not single box)"))
-               (rem-array
-                (vector-take-right (rem-value-shape arr) r)
-                (subvector
-                 (rem-value-data arr)
-                 offset
-                 csize))]))
+            (begin
+              (when (debug-mode) (printf " (not single box)"))
+              (rem-array (vector-take-right (rem-array-shape arr) r)
+                         (subvector (rem-array-data arr)
+                                    offset
+                                    csize))))
           (when (debug-mode)
             (printf " -- ~v\n" arg-cell))
           arg-cell))
@@ -161,37 +148,26 @@
       ;;       (i.e. frame-shape ++ cell-shape) result shapes
       [(equal? 0 (vector-length result-cells)) result-shape]
       [(for/and ([c result-cells])
-         (equal? (rem-value-shape (vector-ref result-cells 0))
-                 (rem-value-shape c)))
+         (equal? (rem-array-shape (vector-ref result-cells 0))
+                 (rem-array-shape c)))
        (when (debug-mode)
          (printf "using cell shape ~v\n"
-                 (rem-value-shape (vector-ref result-cells 0))))
+                 (rem-array-shape (vector-ref result-cells 0))))
        (vector-append principal-frame
-                      (rem-value-shape (vector-ref result-cells 0)))]
+                      (rem-array-shape (vector-ref result-cells 0)))]
       [else (error "Result cells have mismatched shapes: ~v" result-cells)]))
   (when (debug-mode) (printf "final-shape = ~v\n" final-shape))
   
   ;; determine final result data: all result cells' data vectors concatenated
   (define final-data
-    (if (and (> (vector-length result-cells) 0)
-             (rem-box? (vector-ref result-cells 0)))
-        (for/vector ([r result-cells]) r)
-        (apply vector-append
-               (for/list ([r result-cells])
-                 (rem-value-data r)))))
+    (apply vector-append
+           (for/list ([r result-cells])
+                     (rem-array-data r))))
   (when (debug-mode)
     (printf "final-data = ~v\n" final-data)
     (printf "(equal? #() final-shape) = ~v\n"
-            (equal? #() final-shape))
-    (printf "(rem-box? (vector-ref final-data 0)) = ~v\n"
-            (rem-box? (vector-ref final-data 0))))
-  (if (and (equal? #() final-shape)
-           (rem-box? (vector-ref final-data 0)))
-      (begin (when (debug-mode)
-               (printf "returning just the box ~v\n"
-                       (vector-ref final-data 0)))
-             (vector-ref final-data 0))
-      (rem-array final-shape final-data)))
+            (equal? #() final-shape)))
+  (rem-array final-shape final-data))
 
 ;;; Contract constructor for vectors of specified length
 (define ((vector-length/c elts len) vec)
@@ -290,10 +266,6 @@
 ;;; - data, a vector of any
 (provide
  (contract-out
-  #;(struct rem-array
-      ([shape (vectorof exact-nonnegative-integer? #:immutable #t)]
-       [data (vectorof any #:immutable #t)])
-      #:omit-constructor)
   (rem-array (->i ([shape (vectorof exact-nonnegative-integer?)]
                    [data (shape) (vector-length/c
                                   any/c
@@ -376,13 +348,10 @@
 ;;; Construct an array as a vector of -1-cells
 (provide
  (contract-out (build-vec (->* ()
-                               #:rest (listof (or/c rem-array? rem-box?))
+                               #:rest (listof rem-array?)
                                rem-array?))))
 (define (build-vec . arrs)
   (define (only-unique-element xs)
-    #;
-    (when (equal? 0 (sequence-length xs))
-      (error "looking for unique element in empty sequence"))
     (for/fold ([elt (sequence-ref xs 0)])
       ([x xs])
       (if (equal? x elt)
@@ -392,9 +361,7 @@
     (if (empty? arrs)
         #()
         (only-unique-element
-         (for/list ([a arrs])
-           (cond [(rem-array? a) (rem-array-shape a)]
-                 [(rem-box? a) 'box])))))
+         (for/list ([a arrs]) (rem-array-shape a)))))
   (define num-cells (length arrs))
   (if (equal? cell-shape 'box)
       (rem-array (vector num-cells) (list->vector arrs))
@@ -424,28 +391,6 @@
 (struct rem-box (contents)
   #:transparent
   #:methods gen:custom-write [(define write-proc show-box)])
-
-;;; More permissive variants of rem-array functions
-;;; Find the shape of a Remora value (array or box)
-;;; Boxes are considered to have scalar shape
-(provide (contract-out
-          (rem-value-shape (-> rem-value?
-                               (vectorof exact-nonnegative-integer?)))))
-(define (rem-value-shape v)
-  (cond [(rem-array? v) (rem-array-shape v)]
-        [(rem-box? v) #()]))
-;;; Find the rank of a Remora value (array or box)
-;;; Boxes are considered to have scalar rank
-(define (rem-value-rank v)
-  (cond [(rem-array? v) (rem-array-rank v)]
-        [(rem-box? v) 0]))
-;;; Find the data contents of a Remora value (array or box)
-;;; Boxes are considered to be their own contents
-(define (rem-value-data v)
-  (cond [(rem-array? v) (rem-array-data v)]
-        [(rem-box? v) v]))
-;;; Determine whether a value is a Remora value
-(define (rem-value? v) (or (rem-array? v) (rem-box? v)))
 
 
 ;;; Identify which of two sequences is the prefix of the other, or return #f
@@ -527,6 +472,7 @@
             (for/list [(i arity)] 0)))
 
 ;;; Build a scalar Remora array from a Racket value
+;(provide (contract-out (scalar (-> any/c rem-array?))))
 (define (scalar v) (rem-array #() (vector-immutable v)))
 
 ;;; Extract a racket value from a scalar Remora array
@@ -597,8 +543,8 @@
                               (or/c symbol?
                                     (vectorof exact-nonnegative-integer?)))
                              #:rest
-                             (listof (or/c rem-array? rem-box?))
-                             (or/c rem-array? rem-box?)))))
+                             (listof rem-array?)
+                             rem-array?))))
 (define (remora-apply
          fun
          #:result-shape [result-shape 'no-annotation]
@@ -629,10 +575,10 @@
                (cond [(rem-proc? elt) elt]
                      [(procedure? elt) (rem-scalar-proc elt arity)]))))
 
-(provide (contract-out (racket->remora (-> any/c rem-value?))))
+(provide (contract-out (racket->remora (-> any/c rem-array?))))
 (define (racket->remora val)
   (when (debug-mode) (printf "converting ~v\n" val))
-  (cond [(rem-value? val) (when (debug-mode) (printf "  keeping as is\n"))
+  (cond [(rem-array? val) (when (debug-mode) (printf "  keeping as is\n"))
                           val]
         [else (when (debug-mode) (printf "  wrapping\n"))
               (rem-array #() (vector val))]))

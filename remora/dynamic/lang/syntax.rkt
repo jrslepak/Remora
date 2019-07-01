@@ -4,7 +4,7 @@
          "semantics.rkt"
          syntax/parse
          (for-syntax syntax/parse
-                     (except-in racket/base apply box unbox)
+                     (except-in racket/base apply unbox)
                      (rename-in racket/base [apply racket-apply])
                      racket/list
                      racket/syntax))
@@ -18,7 +18,6 @@
          array
          apply/shape
          :
-         box
          unbox
          vec
          rerank
@@ -44,7 +43,6 @@
   (define-syntax-class RANK
     #:description "Remora argument rank"
     #:literals (all)
-    #;(pattern 'all)
     (pattern all)
     (pattern cell-rank:nat))
   (define-syntax-class ATOM
@@ -108,23 +106,19 @@
 ;;; remora macros must explicitly recur on subterms that should be Remora code
 (define-syntax (remora stx)
   (syntax-parse stx
-    #:literals (fn alit array apply apply/shape box unbox vec require provide)
+    #:literals (fn alit array apply apply/shape unbox vec require provide)
     ;; require and provide apparently need to be recognized specially, as
     ;; redefining them breaks lots of things
     [(_ (require subterms ...)) #'(require subterms ...)]
     [(_ (provide subterms ...)) #'(provide subterms ...)]
     ;; a bare ATOM in EXP position is converted to a scalar containing that ATOM
     [(_ bare-atom:ATOM)
-     (begin
-       #;(displayln "converting bare atom to scalar")
-       #'(rem-array (vector) (vector (remora-atom bare-atom))))]
+     #'(rem-array (vector) (vector (remora-atom bare-atom)))]
     ;; check whether head is another Remora form (possibly a remora-macro)
     [(_ (head tail ...))
      #:declare head (static remora-macro? "remora macro")
-     (begin
-       #;(printf "expanding remora macro ~v\n" (syntax->datum #'head))
-       ((remora-macro-transformer (syntax-local-value #'head))
-        #'(head tail ...)))]
+     ((remora-macro-transformer (syntax-local-value #'head))
+      #'(head tail ...))]
     ;; if not, this is function application
     [(_ (head tail ...))
      ((remora-macro-transformer (syntax-local-value #'apply))
@@ -150,7 +144,7 @@
   (syntax-parse stx
     [(_ ((var:id rank:RANK) ...) body ...+)
     #'(rem-proc (λ (var ...) (remora body) ...)
-                 (list #;rank (syntax->rank-value rank) ...))]))
+                 (list (syntax->rank-value rank) ...))]))
 ;;; Need to provide some definition for `all` in order to use it as a literal
 (define-syntax all
   (syntax-id-rules ()
@@ -194,16 +188,6 @@
      #'(remora-apply (remora fun)
                      #:result-shape (rem-array->vector (remora shp))
                      (remora arg) ...)]))
-;;; or should the shape only get evaluated if it turns out to be needed?
-;;; if it's by-need, will need to make it a thunk and have apply-rem-array
-;;; force it whenn needed
-
-;;; (box expr)
-;;;  (rem-box expr)
-;;; TODO: automated test
-(define-remora-syntax (box stx)
-  (syntax-parse stx
-    [(_ contents) #'(rem-box (remora contents))]))
 
 ;;; (unbox var some-box expr)
 ;;;  (let ([var (rem-box-contents some-box)]) expr)
@@ -211,7 +195,9 @@
 (define-remora-syntax (unbox stx)
   (syntax-parse stx
     [(_ var:id some-box body)
-     #'(let ([var (rem-box-contents (remora some-box))]) (remora body))]))
+     #'(let ([var (rem-box-contents (scalar->atom (remora some-box)))])
+         (when (debug-mode) (printf "box contained ~v\n" var))
+         (remora body))]))
 
 ;;; (vec expr ...)
 ;;;  (build-vec expr ...)
@@ -267,15 +253,6 @@
   (syntax-parse stx
     [(_ structname:id (fieldname:id ...+))
      #'(struct structname (fieldname ...) #:transparent)]))
-
-#;
-(define-remora-syntax (require stx)
-  (syntax-parse stx
-    [(_ subterm ...) #'(require subterm ...)]))
-#;
-(define-remora-syntax (provide stx)
-  (syntax-parse stx
-    [(_ subterm ...) #'(provide subterm ...)]))
 
 ;;; (record fname ...) produces a record-building function
 (define-remora-syntax (record stx)
