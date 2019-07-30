@@ -3,6 +3,7 @@
 (require "records.rkt"
          "semantics.rkt"
          syntax/parse
+         (rename-in racket/base [apply racket-apply])
          (for-syntax syntax/parse
                      (except-in racket/base apply unbox)
                      (rename-in racket/base [apply racket-apply])
@@ -195,9 +196,14 @@
 (define-remora-syntax (unbox stx)
   (syntax-parse stx
     [(_ var:id some-box body)
-     #'(let ([var (rem-box-contents (scalar->atom (remora some-box)))])
-         (when (debug-mode) (printf "box contained ~v\n" var))
-         (remora body))]))
+     #'(let ([boxes (remora some-box)])
+         (when (debug-mode) (printf "Taking apart array of boxes: ~v\n" boxes))
+         (racket-apply
+          build-vec
+          (for/list ([b (rem-array-data boxes)])
+                    (let ([var (rem-box-contents b)])
+                      (when (debug-mode) (printf "box contained ~v\n" var))
+                      (remora body)))))]))
 
 ;;; (vec expr ...)
 ;;;  (build-vec expr ...)
