@@ -197,13 +197,14 @@
   (syntax-parse stx
     [(_ var:id some-box body)
      #'(let ([boxes (remora some-box)])
-         (when (debug-mode) (printf "Taking apart array of boxes: ~v\n" boxes))
-         (racket-apply
-          build-vec
-          (for/list ([b (rem-array-data boxes)])
-                    (let ([var (rem-box-contents b)])
-                      (when (debug-mode) (printf "box contained ~v\n" var))
-                      (remora body)))))]))
+         (when (debug-mode) (printf "Taking apart array of boxes: ~s\n" boxes))
+         (let ([result-cells (for/list ([b (rem-array-data boxes)])
+                                       (let ([var (rem-box-contents b)])
+                                         (when (debug-mode) (printf "box contained ~s\n" var))
+                                         (remora body)))])
+           (when (debug-mode) (printf "Unbox result cells: ~s\n" result-cells))
+           (build-frame (rem-array-shape boxes)
+                        result-cells)))]))
 
 ;;; (vec expr ...)
 ;;;  (build-vec expr ...)

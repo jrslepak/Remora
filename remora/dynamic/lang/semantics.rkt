@@ -344,6 +344,24 @@
   (check-equal? (R+ array-ex:scalar1 array-ex:scalar2)
                 (rem-array #() #(6))))
 
+;;; Construct an array as a frame of cells
+(provide
+ (contract-out (build-frame (->* ((vectorof exact-nonnegative-integer?)
+                                  (sequence/c rem-array?))
+                                 ((or/c (vectorof exact-nonnegative-integer?) #f))
+                                 rem-array?))))
+(define (build-frame fshp cells [cshp #f])
+  (define final-shape
+    (cond [(and (= 0 (sequence-length cells)) (not cshp))
+           (error "Empty frame ~v with no shape annotation" fshp)]
+          [(= 0 (sequence-length cells)) (vector-append fshp cshp)]
+          [(for/and ([c cells])
+                    (equal? (rem-array-shape (sequence-ref cells 0))
+                            (rem-array-shape c)))
+           (vector-append fshp (rem-array-shape (sequence-ref cells 0)))]
+          [else (error "Result cells have mismatched shapes: ~v" cells)]))
+  (rem-array final-shape
+             (apply vector-append (for/list ([c cells]) (rem-array-data c)))))
 
 ;;; Construct an array as a vector of -1-cells
 (provide
@@ -483,12 +501,16 @@
                     any/c))))
 (define (scalar->atom a) (vector-ref (rem-array-data a) 0))
 
-;;; Build a Remora array from a nested Racket list
+;;; Build a Remora array from a nested Racket list of cells, themselves
+;;; represented as Remora arrays. As the null case of nesting, a Remora array
+;;; on its own instead of in a list will be left as is (i.e., put into a
+;;; scalar frame).
 (provide
  (contract-out
-  (list->array (-> regular-list? rem-array?))))
+  (list->array (-> (or/c rem-array? regular-list?) rem-array?))))
 (define (list->array xs)
-  (cond [(empty? xs) (rem-array #(0) #())]
+  (cond [(rem-array? xs) xs]
+        [(empty? xs) (rem-array #(0) #())]
         [(list? (first xs))
          (apply build-vec (for/list ([x xs]) (list->array x)))]
         [else (apply build-vec (for/list ([x xs]) (scalar x)))]))
