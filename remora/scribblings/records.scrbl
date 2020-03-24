@@ -70,7 +70,7 @@ That is, @code[#:lang "remora/dynamic"]{((view L) R)}
 is equal to the field of @code[#:lang "remora/dynamic"]{R}
 focused by @code[#:lang "remora/dynamic"]{L}.
 
-@code[#:lang "remora/dynamic"]{(view (compose (lens fname ...)))}
+@code[#:lang "remora/dynamic"]{(view (compose (lens fname) ...))}
 can also be written as
 @code[#:lang "remora/dynamic"]{#_(fname ...)}.}
 
