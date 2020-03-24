@@ -501,13 +501,20 @@
   (define new-elt-count (for/product ([d (rem-array-data new-shape)]) d))
   (define old-elts (rem-array-data arr))
   (define old-elt-count (vector-length old-elts))
-  (rem-array
-   (rem-array-data new-shape)
-   (vector-take
-    (apply vector-append
-           (for/list ([i (ceiling (/ new-elt-count old-elt-count))])
-                     old-elts))
-    new-elt-count)))
+  (cond
+    ;; reshaping empty -> empty
+    [(and (zero? old-elt-count) (zero? new-elt-count))
+     (rem-array (rem-array-data new-shape) (vector))]
+    ;; reshaping empty -> nonempty (error case)
+    [(zero? old-elt-count) (error 'R_reshape "cannot reshape empty array to nonempty")]
+    ;; reshaping nonempty -> nonempty
+    [else (rem-array
+           (rem-array-data new-shape)
+           (vector-take
+            (apply vector-append
+                   (for/list ([i (ceiling (/ new-elt-count old-elt-count))])
+                             old-elts))
+            new-elt-count))]))
 (module+ test
   (check-equal? (remora (R_reshape (array 3 2)
                                    (alit (9) 1 2 3 4 5 6 7 8 9)))
@@ -518,7 +525,10 @@
                                    (alit (5) 'a 'b 'c 'd 'e)))
                 (remora (array (array 'a 'b)
                                (array 'c 'd)
-                               (array 'e 'a)))))
+                               (array 'e 'a))))
+  (check-equal? (remora (R_reshape (array 0 3)
+                                   (alit (2 0))))
+                (remora (alit (0 3)))))
 (define-primop (R_reshape* [new-shape 1] [arr all])
   (define new-elt-count (for/product ([d (rem-array-data new-shape)]) d))
   (define old-elts (rem-array-data arr))
